@@ -36,10 +36,10 @@ namespace PriorityDemandScheduler
                     {
                         acc += Math.Log(x + 1);
                     }
-                    Console.WriteLine($"Completed task {i}");
+                    Console.WriteLine($"Completed task {idx}");
                     return acc;
                 });
-                tasks[i] = task;
+                tasks[idx] = task;
             }
 
             Task.WaitAll(tasks);

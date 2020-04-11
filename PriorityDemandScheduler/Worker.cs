@@ -17,12 +17,23 @@ namespace PriorityDemandScheduler
             _threadIndex = threadIndex;
         }
 
-        public async Task RunLoop(CancellationToken cts) 
+        public async Task RunLoop(CancellationToken cts)
         {
             while (!cts.IsCancellationRequested)
             {
-                var job = await _scheduler.GetNextJob(_threadIndex);
-                job.RunSynchronously();
+                try
+                {
+                    var job = await _scheduler.GetNextJob(_threadIndex);
+                    if (job == null)
+                    {
+                        Console.WriteLine("null job");
+                    }
+                    job.RunSynchronously();
+                }
+                catch (Exception exc)
+                {
+                    Console.WriteLine($"Caught exception: {exc}");
+                }
             }
         }
     }

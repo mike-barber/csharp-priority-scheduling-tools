@@ -38,19 +38,29 @@ namespace PriorityDemandScheduler
         {
             returnedTask = null;
 
-            // get job for this thread
-            if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
             {
-                returnedTask = task;
-                return true;
+                // get job for this thread
+                if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
+                {
+                    returnedTask = task;
+                    if (returnedTask == null)
+                    {
+                        Console.WriteLine("null task");
+                    }
+                    return true;
+                }
             }
 
             // otherwise steal a job for another thread
             foreach (var q in _queue.ThreadTasks.Values)
             {
-                if (q.TryDequeue(out var stolenTask))
+                if (q.TryDequeue(out var task))
                 {
                     returnedTask = task;
+                    if (returnedTask == null)
+                    {
+                        Console.WriteLine("null task");
+                    }
                     return true;
                 }
             }
@@ -103,12 +113,14 @@ namespace PriorityDemandScheduler
                 // if a task is available right now, return that
                 if (TryGetNext(threadIndex, out var task))
                 {
+                    Console.WriteLine($"Immediate task for {threadIndex}: {task}");
                     return Task.FromResult(task);
                 }
 
                 // failing that, return a task completion source -- we'll hit this when a job arrives
                 var tcs = new TaskCompletionSource<Task>();
                 _waiting[threadIndex] = tcs;
+                Console.WriteLine($"Waiting on task for {threadIndex}: {tcs.Task}");
                 return tcs.Task;
             }
         }
