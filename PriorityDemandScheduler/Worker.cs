@@ -23,11 +23,12 @@ namespace PriorityDemandScheduler
             {
                 try
                 {
-                    var task = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
+                    var future = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
                     try
                     {
-                        task.Start();
-                        await task.ConfigureAwait(false);
+                        //task.Start();
+                        //await task.ConfigureAwait(false);
+                        future.Run();
                     }
                     catch (OperationCanceledException)
                     {
@@ -44,6 +45,7 @@ namespace PriorityDemandScheduler
                 }
             }
             Console.WriteLine($"\tWorker complete: {_threadIndex}");
+            
         }
     }
 }

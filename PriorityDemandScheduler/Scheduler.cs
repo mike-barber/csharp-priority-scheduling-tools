@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -10,14 +11,14 @@ namespace PriorityDemandScheduler
 {
     public class PriorityQueue
     {
-        public Dictionary<int, Queue<Task>> ThreadTasks;
+        public Dictionary<int, Queue<FutureBase>> ThreadTasks;
 
         public PriorityQueue(int threads)
         {
-            ThreadTasks = new Dictionary<int, Queue<Task>>();
+            ThreadTasks = new Dictionary<int, Queue<FutureBase>>();
             for (int i = 0; i < threads; ++i)
             {
-                ThreadTasks[i] = new Queue<Task>();
+                ThreadTasks[i] = new Queue<FutureBase>();
             }
         }
     }
@@ -26,12 +27,12 @@ namespace PriorityDemandScheduler
     {
         readonly object _lk = new object();
         readonly PriorityQueue _queue;
-        readonly TaskCompletionSource<Task>[] _waiting;
+        readonly TaskCompletionSource<FutureBase>[] _waiting;
 
         public Scheduler(int threads, CancellationToken ct)
         {
             _queue = new PriorityQueue(threads);
-            _waiting = new TaskCompletionSource<Task>[threads];
+            _waiting = new TaskCompletionSource<FutureBase>[threads];
 
             // cancel all waiting jobs if the token is triggered
             ct.Register(() => CancelWaits(ct));
@@ -60,7 +61,7 @@ namespace PriorityDemandScheduler
         }
 
         // inside lock
-        private bool TryGetNext(int threadIndex, out Task returnedTask)
+        private bool TryGetNext(int threadIndex, out FutureBase returnedTask)
         {
             returnedTask = null;
 
@@ -132,7 +133,7 @@ namespace PriorityDemandScheduler
         }
 
 
-        public Task<Task> GetNextJob(int threadIndex)
+        public Task<FutureBase> GetNextJob(int threadIndex)
         {
             lock (_lk)
             {
@@ -144,7 +145,7 @@ namespace PriorityDemandScheduler
                 }
 
                 // failing that, return a task completion source -- we'll hit this when a job arrives
-                var tcs = new TaskCompletionSource<Task>();
+                var tcs = new TaskCompletionSource<FutureBase>();
                 _waiting[threadIndex] = tcs;
                 //Console.WriteLine($"TaskCompletionSource created for {threadIndex}: {tcs} with task {tcs.Task.Id}");
                 return tcs.Task;
@@ -156,14 +157,16 @@ namespace PriorityDemandScheduler
             lock (_lk)
             {
                 // enqueue the task
-                var task = new Task<T>(function);
-                _queue.ThreadTasks[threadAffinity].Enqueue(task);
+                //var task = new Task<T>(function);
+                var tcs = new TaskCompletionSource<T>();
+                var future = new Future<T>(function, tcs);
+                _queue.ThreadTasks[threadAffinity].Enqueue(future);
 
                 // assign queued tasks to any workers waiting
                 AssignTasksToWaiting();
 
                 // return the task we've just queued
-                return task;
+                return tcs.Task;
             }
         }
     }

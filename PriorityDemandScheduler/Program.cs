@@ -22,7 +22,7 @@ namespace PriorityDemandScheduler
                 .ToArray();
 
             var workerTasks = workers
-                .Select(w => w.RunLoop(cts.Token))
+                .Select(w => Task.Run(() => w.RunLoop(cts.Token)))
                 .ToArray();
 
             // counts
