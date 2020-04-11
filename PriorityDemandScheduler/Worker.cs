@@ -19,6 +19,7 @@ namespace PriorityDemandScheduler
 
         public async Task RunLoop(CancellationToken ct)
         {
+            Console.WriteLine($"\tWorker {_threadIndex} started...");
             while (!ct.IsCancellationRequested)
             {
                 try

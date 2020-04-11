@@ -47,7 +47,7 @@ namespace PriorityDemandScheduler
             {
                 var idx = i;
                 var threadAffinity = i % Environment.ProcessorCount;
-                var priority = i % 2; // interleave tasks
+                var priority = i % 3; // interleave tasks
                 var task = scheduler.Run(priority, threadAffinity, () =>
                 {
                     double acc = 0.0;
