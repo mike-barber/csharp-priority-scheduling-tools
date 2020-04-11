@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Metadata.Ecma335;
 using System.Threading;
@@ -8,7 +9,7 @@ namespace PriorityDemandScheduler
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             using var cts = new CancellationTokenSource();
 
@@ -24,6 +25,23 @@ namespace PriorityDemandScheduler
                 .Select(w => w.RunLoop(cts.Token))
                 .ToArray();
 
+            // counts
+            var counts = new SortedList<int, int>[Environment.ProcessorCount];
+            for (int i = 0; i < Environment.ProcessorCount; ++i)
+                counts[i] = new SortedList<int, int>();
+
+            var lk = new object();
+            void AddCount(int affinity, int threadId)
+            {
+                lock (lk)
+                {
+                    var c = counts[affinity];
+                    if (!c.ContainsKey(threadId)) c[threadId] = 0;
+                    c[threadId] += 1;
+                }
+            }
+
+
             var tasks = new Task<double>[N];
             for (int i = 0; i < 200; ++i)
             {
@@ -33,23 +51,29 @@ namespace PriorityDemandScheduler
                 var task = scheduler.Run(priority, threadAffinity, () =>
                 {
                     double acc = 0.0;
-                    for (int x = 0; x < 1e6; ++x)
+                    for (int x = 0; x < 1e7; ++x)
                     {
                         acc += Math.Log(x + 1);
                     }
-                    Console.WriteLine($"Completed task for job {idx}");
+                    Console.WriteLine($"Completed task for job {idx} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {threadAffinity}");
+                    AddCount(threadAffinity, Thread.CurrentThread.ManagedThreadId);
                     return acc;
                 });
                 tasks[idx] = task;
             }
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             Console.WriteLine("All tasks complete; shutting down");
             cts.Cancel();
 
-            Task.WaitAll(workerTasks);
+            await Task.WhenAll(workerTasks);
             Console.WriteLine("Shutdown complete");
+
+            foreach (var c in counts)
+            {
+                Console.WriteLine(string.Join("\t", c));
+            }
         }
     }
 }

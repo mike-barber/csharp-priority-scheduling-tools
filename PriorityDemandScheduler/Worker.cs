@@ -24,7 +24,6 @@ namespace PriorityDemandScheduler
                 try
                 {
                     var task = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
-                    Console.WriteLine($"\tWorker {_threadIndex} starting job {task.Id}");
                     try
                     {
                         task.Start();
@@ -34,8 +33,6 @@ namespace PriorityDemandScheduler
                     {
                         Console.WriteLine($"\tWorker {_threadIndex} task cancelled.");
                     }
-                    //task.RunSynchronously();
-                    Console.WriteLine($"\tWorker {_threadIndex} completed job {task.Id}");
                 }
                 catch (OperationCanceledException)
                 {

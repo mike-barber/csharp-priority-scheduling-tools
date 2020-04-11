@@ -50,7 +50,8 @@ namespace PriorityDemandScheduler
                     if (wt.TrySetCanceled(ct))
                     {
                         Console.WriteLine($"Cancelled waiting: thread {ti} waiting {wt}");
-                    } else
+                    }
+                    else
                     {
                         Console.WriteLine($"Could not cancel: thread {ti} waiting {wt}");
                     }
@@ -68,10 +69,7 @@ namespace PriorityDemandScheduler
                 if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
                 {
                     returnedTask = task;
-                    if (returnedTask == null)
-                    {
-                        Console.WriteLine("null task");
-                    }
+                    Debug.Assert(task != null);
                     return true;
                 }
             }
@@ -82,10 +80,8 @@ namespace PriorityDemandScheduler
                 if (q.TryDequeue(out var task))
                 {
                     returnedTask = task;
-                    if (returnedTask == null)
-                    {
-                        Console.WriteLine("null task");
-                    }
+                    Debug.Assert(task != null);
+                    Console.WriteLine("Stolen immediate");
                     return true;
                 }
             }
@@ -100,14 +96,14 @@ namespace PriorityDemandScheduler
             for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
             {
                 var tcs = _waiting[threadIndex];
-                if (tcs == null) 
+                if (tcs == null)
                     continue;
-                
+
                 if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
                 {
                     // set result on waiter, and clear slot
                     tcs.SetResult(task);
-                    Console.WriteLine($"Waiter for {threadIndex} assigned task: {task.Id}");
+                    //Console.WriteLine($"Waiter for {threadIndex} assigned task: {task.Id}");
                     _waiting[threadIndex] = null;
                 }
             }
@@ -124,14 +120,15 @@ namespace PriorityDemandScheduler
                     if (q.TryDequeue(out var task))
                     {
                         // set result on waiter and clear slot
+                        Console.WriteLine("Stolen assigned");
                         tcs.SetResult(task);
-                        Console.WriteLine($"Waiter for {threadIndex} assigned stolen task: {task.Id}");
+                        //Console.WriteLine($"Waiter for {threadIndex} assigned stolen task: {task.Id}");
                         _waiting[threadIndex] = null;
                     }
                 }
             }
 
-            Console.WriteLine("No tasks available");
+            //Console.WriteLine("No tasks available");
         }
 
 
@@ -142,14 +139,14 @@ namespace PriorityDemandScheduler
                 // if a task is available right now, return that
                 if (TryGetNext(threadIndex, out var task))
                 {
-                    Console.WriteLine($"Immediate task for {threadIndex}: {task.Id}");
+                    //Console.WriteLine($"Immediate task for {threadIndex}: {task.Id}");
                     return Task.FromResult(task);
                 }
 
                 // failing that, return a task completion source -- we'll hit this when a job arrives
                 var tcs = new TaskCompletionSource<Task>();
                 _waiting[threadIndex] = tcs;
-                Console.WriteLine($"TaskCompletionSource created for {threadIndex}: {tcs} with task {tcs.Task.Id}");
+                //Console.WriteLine($"TaskCompletionSource created for {threadIndex}: {tcs} with task {tcs.Task.Id}");
                 return tcs.Task;
             }
         }
