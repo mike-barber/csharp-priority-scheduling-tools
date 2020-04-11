@@ -13,7 +13,7 @@ namespace PriorityDemandScheduler
         {
             using var cts = new CancellationTokenSource();
 
-            int N = 200;
+            int N = 500;
             var scheduler = new Scheduler(Environment.ProcessorCount, cts.Token);
 
 
@@ -43,7 +43,7 @@ namespace PriorityDemandScheduler
 
 
             var tasks = new Task<double>[N];
-            for (int i = 0; i < 200; ++i)
+            for (int i = 0; i < N; ++i)
             {
                 var idx = i;
                 var threadAffinity = i % Environment.ProcessorCount;
@@ -51,7 +51,7 @@ namespace PriorityDemandScheduler
                 var task = scheduler.Run(priority, threadAffinity, () =>
                 {
                     double acc = 0.0;
-                    for (int x = 0; x < 1e7; ++x)
+                    for (int x = 0; x < 1e6; ++x)
                     {
                         acc += Math.Log(x + 1);
                     }
