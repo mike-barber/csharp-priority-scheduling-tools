@@ -23,18 +23,19 @@ namespace PriorityDemandScheduler
             {
                 try
                 {
-                    var job = await _scheduler.GetNextJob(_threadIndex);
-                    if (job == null)
-                    {
-                        Console.WriteLine("null job");
-                    }
-                    job.RunSynchronously();
+                    var task = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
+                    Console.WriteLine($"\tWorker {_threadIndex} starting job {task.Id}");
+                    task.Start();
+                    await task.ConfigureAwait(false);
+                    //task.RunSynchronously();
+                    Console.WriteLine($"\tWorker {_threadIndex} completed job {task.Id}");
                 }
                 catch (Exception exc)
                 {
                     Console.WriteLine($"Caught exception: {exc}");
                 }
             }
+            Console.WriteLine($"\tWorker complete: {_threadIndex}");
         }
     }
 }

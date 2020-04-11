@@ -36,7 +36,7 @@ namespace PriorityDemandScheduler
                     {
                         acc += Math.Log(x + 1);
                     }
-                    Console.WriteLine($"Completed task {idx}");
+                    Console.WriteLine($"Completed task for job {idx}");
                     return acc;
                 });
                 tasks[idx] = task;
