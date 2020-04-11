@@ -72,7 +72,7 @@ namespace PriorityDemandScheduler
 
             foreach (var c in counts)
             {
-                Console.WriteLine(string.Join("\t", c));
+                Console.WriteLine(string.Join("\t", c.OrderByDescending(cc => cc.Value)));
             }
         }
     }

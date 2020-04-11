@@ -101,12 +101,23 @@ namespace PriorityDemandScheduler
         // inside lock
         private void AssignJobsToWaiting()
         {
+            // count number of waiting workers
+            var numWaiting = 0;
+            foreach (var wt in _waiting)
+            {
+                if (wt != null) numWaiting++;
+            }
+
             // go through the queues in priority-order, lowest first (it's a sorted list)
             foreach (var queue in _priorityQueues.Values)
             {
+                if (numWaiting == 0) break;
+
                 // non-stolen
                 for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
                 {
+                    if (numWaiting == 0) break;
+
                     var tcs = _waiting[threadIndex];
                     if (tcs == null)
                         continue;
@@ -116,12 +127,15 @@ namespace PriorityDemandScheduler
                         // set result on waiter, and clear slot
                         tcs.SetResult(fut);
                         _waiting[threadIndex] = null;
+                        numWaiting--;
                     }
                 }
 
                 // stolen
                 for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
                 {
+                    if (numWaiting == 0) break;
+
                     var tcs = _waiting[threadIndex];
                     if (tcs == null)
                         continue;
@@ -134,6 +148,7 @@ namespace PriorityDemandScheduler
                             Console.WriteLine("Stolen assigned");
                             tcs.SetResult(fut);
                             _waiting[threadIndex] = null;
+                            numWaiting--;
                         }
                     }
                 }
