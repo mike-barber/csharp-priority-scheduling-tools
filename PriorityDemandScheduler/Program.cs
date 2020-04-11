@@ -47,7 +47,7 @@ namespace PriorityDemandScheduler
             {
                 var idx = i;
                 var threadAffinity = i % Environment.ProcessorCount;
-                var priority = 0;
+                var priority = i % 2; // interleave tasks
                 var task = scheduler.Run(priority, threadAffinity, () =>
                 {
                     double acc = 0.0;
@@ -55,7 +55,7 @@ namespace PriorityDemandScheduler
                     {
                         acc += Math.Log(x + 1);
                     }
-                    Console.WriteLine($"Completed task for job {idx} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {threadAffinity}");
+                    Console.WriteLine($"Completed task for job {idx} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {threadAffinity} priority {priority}");
                     AddCount(threadAffinity, Thread.CurrentThread.ManagedThreadId);
                     return acc;
                 });

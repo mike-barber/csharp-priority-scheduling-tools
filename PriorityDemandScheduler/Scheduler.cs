@@ -10,10 +10,13 @@ namespace PriorityDemandScheduler
 {
     public class PriorityQueue
     {
+        public readonly int Priority;
         public Dictionary<int, Queue<Task>> ThreadTasks;
 
-        public PriorityQueue(int threads)
+        public PriorityQueue(int threads, int prio)
         {
+            Priority = prio;
+
             ThreadTasks = new Dictionary<int, Queue<Task>>();
             for (int i = 0; i < threads; ++i)
             {
@@ -25,12 +28,14 @@ namespace PriorityDemandScheduler
     public class Scheduler
     {
         readonly object _lk = new object();
-        readonly PriorityQueue _queue;
+        readonly SortedList<int, PriorityQueue> _priorityQueues;
         readonly TaskCompletionSource<Task>[] _waiting;
+        readonly int _numThreads;
 
         public Scheduler(int threads, CancellationToken ct)
         {
-            _queue = new PriorityQueue(threads);
+            _numThreads = threads;
+            _priorityQueues = new SortedList<int, PriorityQueue>();
             _waiting = new TaskCompletionSource<Task>[threads];
 
             // cancel all waiting jobs if the token is triggered
@@ -64,25 +69,29 @@ namespace PriorityDemandScheduler
         {
             returnedTask = null;
 
+            // go through the queues in priority-order, lowest first (it's a sorted list)
+            foreach (var queue in _priorityQueues.Values)
             {
                 // get job for this thread
-                if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
                 {
-                    returnedTask = task;
-                    Debug.Assert(task != null);
-                    return true;
+                    if (queue.ThreadTasks[threadIndex].TryDequeue(out var task))
+                    {
+                        returnedTask = task;
+                        Debug.Assert(task != null);
+                        return true;
+                    }
                 }
-            }
 
-            // otherwise steal a job for another thread
-            foreach (var q in _queue.ThreadTasks.Values)
-            {
-                if (q.TryDequeue(out var task))
+                // otherwise steal a job for another thread
+                foreach (var tq in queue.ThreadTasks.Values)
                 {
-                    returnedTask = task;
-                    Debug.Assert(task != null);
-                    Console.WriteLine("Stolen immediate");
-                    return true;
+                    if (tq.TryDequeue(out var task))
+                    {
+                        returnedTask = task;
+                        Debug.Assert(task != null);
+                        Console.WriteLine("Stolen immediate");
+                        return true;
+                    }
                 }
             }
 
@@ -92,43 +101,46 @@ namespace PriorityDemandScheduler
         // inside lock
         private void AssignTasksToWaiting()
         {
-            // non-stolen
-            for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
+            // go through the queues in priority-order, lowest first (it's a sorted list)
+            foreach (var queue in _priorityQueues.Values)
             {
-                var tcs = _waiting[threadIndex];
-                if (tcs == null)
-                    continue;
-
-                if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
+                // non-stolen
+                for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
                 {
-                    // set result on waiter, and clear slot
-                    tcs.SetResult(task);
-                    //Console.WriteLine($"Waiter for {threadIndex} assigned task: {task.Id}");
-                    _waiting[threadIndex] = null;
-                }
-            }
+                    var tcs = _waiting[threadIndex];
+                    if (tcs == null)
+                        continue;
 
-            // stolen
-            for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
-            {
-                var tcs = _waiting[threadIndex];
-                if (tcs == null)
-                    continue;
-
-                foreach (var q in _queue.ThreadTasks.Values)
-                {
-                    if (q.TryDequeue(out var task))
+                    if (queue.ThreadTasks[threadIndex].TryDequeue(out var task))
                     {
-                        // set result on waiter and clear slot
-                        Console.WriteLine("Stolen assigned");
+                        // set result on waiter, and clear slot
                         tcs.SetResult(task);
-                        //Console.WriteLine($"Waiter for {threadIndex} assigned stolen task: {task.Id}");
+                        //Console.WriteLine($"Waiter for {threadIndex} assigned task: {task.Id}");
                         _waiting[threadIndex] = null;
                     }
                 }
-            }
 
-            //Console.WriteLine("No tasks available");
+                // stolen
+                for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
+                {
+                    var tcs = _waiting[threadIndex];
+                    if (tcs == null)
+                        continue;
+
+                    foreach (var q in queue.ThreadTasks.Values)
+                    {
+                        if (q.TryDequeue(out var task))
+                        {
+                            // set result on waiter and clear slot
+                            Console.WriteLine("Stolen assigned");
+                            tcs.SetResult(task);
+                            _waiting[threadIndex] = null;
+                        }
+                    }
+                }
+
+                //Console.WriteLine("No tasks available");
+            }
         }
 
 
@@ -146,7 +158,6 @@ namespace PriorityDemandScheduler
                 // failing that, return a task completion source -- we'll hit this when a job arrives
                 var tcs = new TaskCompletionSource<Task>();
                 _waiting[threadIndex] = tcs;
-                //Console.WriteLine($"TaskCompletionSource created for {threadIndex}: {tcs} with task {tcs.Task.Id}");
                 return tcs.Task;
             }
         }
@@ -155,9 +166,13 @@ namespace PriorityDemandScheduler
         {
             lock (_lk)
             {
-                // enqueue the task
+                // enqueue the task, creating a new priority class if required
                 var task = new Task<T>(function);
-                _queue.ThreadTasks[threadAffinity].Enqueue(task);
+                if (!_priorityQueues.TryGetValue(priority, out var queue))
+                {
+                    _priorityQueues[priority] = queue = new PriorityQueue(_numThreads, priority);
+                }
+                queue.ThreadTasks[threadAffinity].Enqueue(task);
 
                 // assign queued tasks to any workers waiting
                 AssignTasksToWaiting();

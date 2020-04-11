@@ -3,7 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30002.166
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriorityDemandScheduler", "PriorityDemandScheduler\PriorityDemandScheduler.csproj", "{69C38609-5EB2-4176-A1AB-0CBE15E0B52F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PriorityDemandScheduler", "PriorityDemandScheduler\PriorityDemandScheduler.csproj", "{69C38609-5EB2-4176-A1AB-0CBE15E0B52F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{CF94A4A3-4985-4F67-9C36-964D12681899}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
