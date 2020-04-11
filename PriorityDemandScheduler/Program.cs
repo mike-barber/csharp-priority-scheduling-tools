@@ -10,10 +10,11 @@ namespace PriorityDemandScheduler
     {
         static void Main(string[] args)
         {
-            int N = 200;
-            var scheduler = new Scheduler(Environment.ProcessorCount);
+            using var cts = new CancellationTokenSource();
 
-            var cts = new CancellationTokenSource();
+            int N = 200;
+            var scheduler = new Scheduler(Environment.ProcessorCount, cts.Token);
+
 
             var workers = Enumerable.Range(0, Environment.ProcessorCount)
                 .Select(idx => new Worker(scheduler, idx))

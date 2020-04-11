@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -27,10 +28,34 @@ namespace PriorityDemandScheduler
         readonly PriorityQueue _queue;
         readonly TaskCompletionSource<Task>[] _waiting;
 
-        public Scheduler(int threads)
+        public Scheduler(int threads, CancellationToken ct)
         {
             _queue = new PriorityQueue(threads);
             _waiting = new TaskCompletionSource<Task>[threads];
+
+            // cancel all waiting jobs if the token is triggered
+            ct.Register(() => CancelWaits(ct));
+        }
+
+        private void CancelWaits(CancellationToken ct)
+        {
+            lock (_lk)
+            {
+                for (var ti = 0; ti < _waiting.Length; ++ti)
+                {
+                    var wt = _waiting[ti];
+                    if (wt == null)
+                        continue;
+
+                    if (wt.TrySetCanceled(ct))
+                    {
+                        Console.WriteLine($"Cancelled waiting: thread {ti} waiting {wt}");
+                    } else
+                    {
+                        Console.WriteLine($"Could not cancel: thread {ti} waiting {wt}");
+                    }
+                }
+            }
         }
 
         // inside lock
