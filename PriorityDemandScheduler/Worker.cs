@@ -26,8 +26,7 @@ namespace PriorityDemandScheduler
                     var future = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
                     try
                     {
-                        //task.Start();
-                        //await task.ConfigureAwait(false);
+                        // run it now on this thread
                         future.Run();
                     }
                     catch (OperationCanceledException)

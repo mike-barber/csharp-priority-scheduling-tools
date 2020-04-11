@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
 {
-    public abstract class FutureBase
+    public abstract class Future
     {
         public abstract void Run();
     }
 
-    public class Future<T> : FutureBase
+    public class Future<T> : Future
     {
         Func<T> _function;
         public TaskCompletionSource<T> CompletionSource;

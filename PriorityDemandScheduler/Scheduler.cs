@@ -11,14 +11,14 @@ namespace PriorityDemandScheduler
 {
     public class PriorityQueue
     {
-        public Dictionary<int, Queue<FutureBase>> ThreadTasks;
+        public Dictionary<int, Queue<Future>> ThreadedJobs;
 
         public PriorityQueue(int threads)
         {
-            ThreadTasks = new Dictionary<int, Queue<FutureBase>>();
+            ThreadedJobs = new Dictionary<int, Queue<Future>>();
             for (int i = 0; i < threads; ++i)
             {
-                ThreadTasks[i] = new Queue<FutureBase>();
+                ThreadedJobs[i] = new Queue<Future>();
             }
         }
     }
@@ -27,12 +27,12 @@ namespace PriorityDemandScheduler
     {
         readonly object _lk = new object();
         readonly PriorityQueue _queue;
-        readonly TaskCompletionSource<FutureBase>[] _waiting;
+        readonly TaskCompletionSource<Future>[] _waiting;
 
         public Scheduler(int threads, CancellationToken ct)
         {
             _queue = new PriorityQueue(threads);
-            _waiting = new TaskCompletionSource<FutureBase>[threads];
+            _waiting = new TaskCompletionSource<Future>[threads];
 
             // cancel all waiting jobs if the token is triggered
             ct.Register(() => CancelWaits(ct));
@@ -61,27 +61,27 @@ namespace PriorityDemandScheduler
         }
 
         // inside lock
-        private bool TryGetNext(int threadIndex, out FutureBase returnedTask)
+        private bool TryGetNext(int threadIndex, out Future returnedFuture)
         {
-            returnedTask = null;
+            returnedFuture = null;
 
             {
                 // get job for this thread
-                if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
+                if (_queue.ThreadedJobs[threadIndex].TryDequeue(out var fut))
                 {
-                    returnedTask = task;
-                    Debug.Assert(task != null);
+                    returnedFuture = fut;
+                    Debug.Assert(fut != null);
                     return true;
                 }
             }
 
             // otherwise steal a job for another thread
-            foreach (var q in _queue.ThreadTasks.Values)
+            foreach (var q in _queue.ThreadedJobs.Values)
             {
-                if (q.TryDequeue(out var task))
+                if (q.TryDequeue(out var fut))
                 {
-                    returnedTask = task;
-                    Debug.Assert(task != null);
+                    returnedFuture = fut;
+                    Debug.Assert(fut != null);
                     Console.WriteLine("Stolen immediate");
                     return true;
                 }
@@ -91,7 +91,7 @@ namespace PriorityDemandScheduler
         }
 
         // inside lock
-        private void AssignTasksToWaiting()
+        private void AssignJobsToWaiting()
         {
             // non-stolen
             for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
@@ -100,11 +100,10 @@ namespace PriorityDemandScheduler
                 if (tcs == null)
                     continue;
 
-                if (_queue.ThreadTasks[threadIndex].TryDequeue(out var task))
+                if (_queue.ThreadedJobs[threadIndex].TryDequeue(out var fut))
                 {
                     // set result on waiter, and clear slot
-                    tcs.SetResult(task);
-                    //Console.WriteLine($"Waiter for {threadIndex} assigned task: {task.Id}");
+                    tcs.SetResult(fut);
                     _waiting[threadIndex] = null;
                 }
             }
@@ -116,38 +115,33 @@ namespace PriorityDemandScheduler
                 if (tcs == null)
                     continue;
 
-                foreach (var q in _queue.ThreadTasks.Values)
+                foreach (var q in _queue.ThreadedJobs.Values)
                 {
-                    if (q.TryDequeue(out var task))
+                    if (q.TryDequeue(out var fut))
                     {
                         // set result on waiter and clear slot
                         Console.WriteLine("Stolen assigned");
-                        tcs.SetResult(task);
-                        //Console.WriteLine($"Waiter for {threadIndex} assigned stolen task: {task.Id}");
+                        tcs.SetResult(fut);
                         _waiting[threadIndex] = null;
                     }
                 }
             }
-
-            //Console.WriteLine("No tasks available");
         }
 
 
-        public Task<FutureBase> GetNextJob(int threadIndex)
+        public Task<Future> GetNextJob(int threadIndex)
         {
             lock (_lk)
             {
                 // if a task is available right now, return that
-                if (TryGetNext(threadIndex, out var task))
+                if (TryGetNext(threadIndex, out var fut))
                 {
-                    //Console.WriteLine($"Immediate task for {threadIndex}: {task.Id}");
-                    return Task.FromResult(task);
+                    return Task.FromResult(fut);
                 }
 
                 // failing that, return a task completion source -- we'll hit this when a job arrives
-                var tcs = new TaskCompletionSource<FutureBase>();
+                var tcs = new TaskCompletionSource<Future>();
                 _waiting[threadIndex] = tcs;
-                //Console.WriteLine($"TaskCompletionSource created for {threadIndex}: {tcs} with task {tcs.Task.Id}");
                 return tcs.Task;
             }
         }
@@ -156,16 +150,15 @@ namespace PriorityDemandScheduler
         {
             lock (_lk)
             {
-                // enqueue the task
-                //var task = new Task<T>(function);
+                // enqueue the job
                 var tcs = new TaskCompletionSource<T>();
-                var future = new Future<T>(function, tcs);
-                _queue.ThreadTasks[threadAffinity].Enqueue(future);
+                var fut = new Future<T>(function, tcs);
+                _queue.ThreadedJobs[threadAffinity].Enqueue(fut);
 
-                // assign queued tasks to any workers waiting
-                AssignTasksToWaiting();
+                // assign queued jobs to any workers waiting
+                AssignJobsToWaiting();
 
-                // return the task we've just queued
+                // return the task for the job we've just queued
                 return tcs.Task;
             }
         }
