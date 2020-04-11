@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection.Metadata.Ecma335;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
@@ -9,10 +11,20 @@ namespace PriorityDemandScheduler
         static void Main(string[] args)
         {
             int N = 200;
-            var scheduler = new Scheduler();
+            var scheduler = new Scheduler(Environment.ProcessorCount);
+
+            var cts = new CancellationTokenSource();
+
+            var workers = Enumerable.Range(0, Environment.ProcessorCount)
+                .Select(idx => new Worker(scheduler, idx))
+                .ToArray();
+
+            var workerTasks = workers
+                .Select(w => w.RunLoop(cts.Token))
+                .ToArray();
 
             var tasks = new Task<double>[N];
-            for (int i=0; i<200; ++i)
+            for (int i = 0; i < 200; ++i)
             {
                 var idx = i;
                 var threadAffinity = i % Environment.ProcessorCount;
@@ -32,7 +44,11 @@ namespace PriorityDemandScheduler
 
             Task.WaitAll(tasks);
 
+            Console.WriteLine("All tasks complete; shutting down");
+            cts.Cancel();
 
+            Task.WaitAll(workerTasks);
+            Console.WriteLine("Shutdown complete");
         }
     }
 }

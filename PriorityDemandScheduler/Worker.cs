@@ -17,7 +17,7 @@ namespace PriorityDemandScheduler
             _threadIndex = threadIndex;
         }
 
-        async Task RunLoop(CancellationToken cts) 
+        public async Task RunLoop(CancellationToken cts) 
         {
             while (!cts.IsCancellationRequested)
             {
