@@ -101,71 +101,29 @@ namespace PriorityDemandScheduler
         }
 
         // inside lock
-        private List<(Future,TaskCompletionSource<Future>)> AssignJobsToWaiting()
+        private List<(Future, TaskCompletionSource<Future>)> AssignJobsToWaiting()
         {
-            // count number of waiting workers
-            var numWaiting = 0;
-            foreach (var wt in _waiting)
+            // simple approach -- assign tasks using TryGetNext
+            List<(Future, TaskCompletionSource<Future>)> assignments = null;
+            for (var threadIdx = 0; threadIdx < _waiting.Length; ++threadIdx)
             {
-                if (wt != null) numWaiting++;
-            }
-            if (numWaiting == 0) 
-                return null;
+                var wt = _waiting[threadIdx];
+                if (wt == null)
+                    continue;
 
-            Console.WriteLine($"Waiting: {numWaiting}");
-
-            // create list of assignments
-            var assignments = new List<(Future, TaskCompletionSource<Future>)>(numWaiting);
-
-            // go through the queues in priority-order, lowest first (it's a sorted list)
-            foreach (var queue in _priorityQueues.Values)
-            {
-                if (numWaiting == 0) break;
-
-                // non-stolen
-                for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
+                // if a job is available, add it to the assignments list
+                if (TryGetNext(threadIdx, out var fut))
                 {
-                    if (numWaiting == 0) break;
-
-                    var tcs = _waiting[threadIndex];
-                    if (tcs == null)
-                        continue;
-
-                    if (queue.ThreadedJobs[threadIndex].TryDequeue(out var fut))
-                    {
-                        // set result on waiter, and clear slot
-                        //tcs.SetResult(fut);
-                        assignments.Add((fut, tcs));
-                        _waiting[threadIndex] = null;
-                        numWaiting--;
-                    }
+                    // lazily create assignments list if required
+                    if (assignments == null) 
+                        assignments = new List<(Future, TaskCompletionSource<Future>)>();
+                    // record assignment
+                    assignments.Add((fut, wt));
+                    // clear from waiting list
+                    _waiting[threadIdx] = null;
                 }
-
-                // stolen
-                for (var threadIndex = 0; threadIndex < _waiting.Length; ++threadIndex)
-                {
-                    if (numWaiting == 0) break;
-
-                    var tcs = _waiting[threadIndex];
-                    if (tcs == null)
-                        continue;
-
-                    foreach (var q in queue.ThreadedJobs.Values)
-                    {
-                        if (q.TryDequeue(out var fut))
-                        {
-                            // set result on waiter and clear slot
-                            Console.WriteLine("Stolen assigned");
-                            //tcs.SetResult(fut);
-                            assignments.Add((fut, tcs));
-                            _waiting[threadIndex] = null;
-                            numWaiting--;
-                        }
-                    }
-                }
+                
             }
-
-            Console.WriteLine($"Assigned: {assignments.Count}");
             return assignments;
         }
 
