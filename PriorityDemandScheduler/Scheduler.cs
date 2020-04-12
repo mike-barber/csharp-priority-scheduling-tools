@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -99,7 +100,7 @@ namespace PriorityDemandScheduler
         }
 
         // inside lock
-        private void AssignJobsToWaiting()
+        private List<(Future,TaskCompletionSource<Future>)> AssignJobsToWaiting()
         {
             // count number of waiting workers
             var numWaiting = 0;
@@ -107,6 +108,10 @@ namespace PriorityDemandScheduler
             {
                 if (wt != null) numWaiting++;
             }
+            Console.WriteLine($"Waiting: {numWaiting}");
+
+            // create list of assignments
+            var assignments = new List<(Future, TaskCompletionSource<Future>)>(numWaiting);
 
             // go through the queues in priority-order, lowest first (it's a sorted list)
             foreach (var queue in _priorityQueues.Values)
@@ -125,7 +130,8 @@ namespace PriorityDemandScheduler
                     if (queue.ThreadedJobs[threadIndex].TryDequeue(out var fut))
                     {
                         // set result on waiter, and clear slot
-                        tcs.SetResult(fut);
+                        //tcs.SetResult(fut);
+                        assignments.Add((fut, tcs));
                         _waiting[threadIndex] = null;
                         numWaiting--;
                     }
@@ -146,13 +152,17 @@ namespace PriorityDemandScheduler
                         {
                             // set result on waiter and clear slot
                             Console.WriteLine("Stolen assigned");
-                            tcs.SetResult(fut);
+                            //tcs.SetResult(fut);
+                            assignments.Add((fut, tcs));
                             _waiting[threadIndex] = null;
                             numWaiting--;
                         }
                     }
                 }
             }
+
+            Console.WriteLine($"Assigned: {assignments.Count}");
+            return assignments;
         }
 
 
@@ -175,22 +185,34 @@ namespace PriorityDemandScheduler
 
         public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function)
         {
+            var fut = new Future<T>(function);
+            List<(Future, TaskCompletionSource<Future>)> assignments = null;
             lock (_lk)
             {
                 // enqueue the task, creating a new priority class if required
-                var fut = new Future<T>(function);
                 if (!_priorityQueues.TryGetValue(priority, out var queue))
                 {
                     _priorityQueues[priority] = queue = new PriorityQueue(_numThreads, priority);
                 }
                 queue.ThreadedJobs[threadAffinity].Enqueue(fut);
 
-                // assign queued jobs to any workers waiting
-                AssignJobsToWaiting();
-
-                // return the task for the job we've just queued
-                return fut.CompletionSource.Task;
+                // assign queued jobs to any workers waiting, but don't apply while we're still in the lock
+                assignments = AssignJobsToWaiting();
             }
+
+            // now apply results to waiting jobs (outside the lock)
+            foreach (var (f,tcs) in assignments)
+            {
+                //tcs.SetResult(f);
+                // notify task completions: asynchronously, otherwise we just land up running them 
+                // on this thread
+                var completion = tcs;
+                var future = f;
+                Task.Run(() => completion.SetResult(future));
+            }
+
+            // return the task for the job we've just queued
+            return fut.CompletionSource.Task;
         }
     }
 }

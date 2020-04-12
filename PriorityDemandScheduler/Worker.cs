@@ -19,12 +19,12 @@ namespace PriorityDemandScheduler
 
         public async Task RunLoop(CancellationToken ct)
         {
-            Console.WriteLine($"\tWorker {_threadIndex} started...");
+            Console.WriteLine($"\tWorker {_threadIndex} started on thread {Thread.CurrentThread.ManagedThreadId}...");
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
-                    var future = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
+                    var future = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(true);
                     try
                     {
                         // run it now on this thread

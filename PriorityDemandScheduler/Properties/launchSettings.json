@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PriorityDemandScheduler": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

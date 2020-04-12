@@ -21,8 +21,18 @@ namespace PriorityDemandScheduler
                 .Select(idx => new Worker(scheduler, idx))
                 .ToArray();
 
+            //var workerTasks = workers
+            //    .Select(w => Task.Run(() => w.RunLoop(cts.Token)))
+            //    .ToArray();
+
+            //Console.WriteLine($"Main thread ID: {Thread.CurrentThread.ManagedThreadId}");
             var workerTasks = workers
-                .Select(w => Task.Run(() => w.RunLoop(cts.Token)))
+                .Select(w =>
+                {
+                    var worker = w;
+                    var task = Task.Factory.StartNew(() => worker.RunLoop(cts.Token), TaskCreationOptions.LongRunning);
+                    return task;
+                })
                 .ToArray();
 
             // counts
