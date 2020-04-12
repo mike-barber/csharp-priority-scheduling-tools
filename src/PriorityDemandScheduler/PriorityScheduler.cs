@@ -162,7 +162,7 @@ namespace PriorityDemandScheduler
             }
 
             // return the task for the job we've just queued
-            return fut.CompletionSource.Task;
+            return fut.GetTask();
         }
 
         public Task WaitForShutdown()

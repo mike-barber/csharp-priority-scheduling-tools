@@ -5,9 +5,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-[MemoryDiagnoser]
+
 namespace PriorityDemandScheduler.Benchmark
 {
+    [MemoryDiagnoser]
     public class SchedulerPerf : IDisposable
     {
         public int NumJobs = 500;
