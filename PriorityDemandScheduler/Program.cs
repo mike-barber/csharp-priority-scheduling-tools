@@ -82,6 +82,7 @@ namespace PriorityDemandScheduler
             {
                 Console.WriteLine(string.Join("\t", c.OrderByDescending(cc => cc.Value)));
             }
+            Console.WriteLine($"Total stolen jobs: {scheduler.StolenCount}");
         }
     }
 }

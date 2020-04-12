@@ -33,6 +33,8 @@ namespace PriorityDemandScheduler
         readonly SortedList<int,PriorityQueue> _priorityQueues;
         readonly TaskCompletionSource<Future>[] _waiting;
         readonly int _numThreads;
+        
+        public long StolenCount { get; private set; }
 
         public Scheduler(int threads, CancellationToken ct)
         {
@@ -92,7 +94,8 @@ namespace PriorityDemandScheduler
                     {
                         returnedFuture = fut;
                         Debug.Assert(fut != null);
-                        Console.WriteLine($"Stolen immediate: {threadIndex} stole job from {otherThreadIdx}");
+                        Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
+                        StolenCount++;
                         return true;
                     }
                 }
