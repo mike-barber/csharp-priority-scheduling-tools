@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BenchmarkDotNet.Running;
+using System;
 
 namespace PriorityDemandScheduler.Benchmark
 {
@@ -6,7 +7,7 @@ namespace PriorityDemandScheduler.Benchmark
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            BenchmarkRunner.Run<SchedulerPerf>();
         }
     }
 }

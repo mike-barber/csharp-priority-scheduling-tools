@@ -60,13 +60,9 @@ namespace PriorityDemandScheduler
                     if (wt == null)
                         continue;
 
-                    if (wt.TrySetCanceled(ct))
+                    if (!wt.TrySetCanceled(ct))
                     {
-                        Console.WriteLine($"Cancelled waiting: thread {ti} waiting {wt}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Could not cancel: thread {ti} waiting {wt}");
+                        Console.WriteLine($"WARNING: Could not cancel: thread {ti} waiting {wt}");
                     }
                 }
             }
@@ -99,7 +95,7 @@ namespace PriorityDemandScheduler
                     {
                         returnedFuture = fut;
                         Debug.Assert(fut != null);
-                        Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
+                        //Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
                         _stolenCount++;
                         return true;
                     }

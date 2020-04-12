@@ -5,12 +5,13 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+[MemoryDiagnoser]
 namespace PriorityDemandScheduler.Benchmark
 {
     public class SchedulerPerf : IDisposable
     {
-        public int NumJobs = 100;
-        public int NumIterations = 1_000_000;
+        public int NumJobs = 500;
+        public int NumIterations = 250_000;
 
         private PriorityScheduler _priorityScheduler;
         private CancellationTokenSource _cancellationTokenSource;
@@ -53,12 +54,36 @@ namespace PriorityDemandScheduler.Benchmark
         }
 
         [Benchmark]
-        public async Task<double> SchedulerRun()
+        public async Task<double> SchedulerRunNoPrio()
         {
             var tasks = new Task<double>[NumJobs];
+            var threads = Environment.ProcessorCount;
             for (var i = 0; i < tasks.Length; ++i)
             {
-                tasks[i] = Task.Run(() => ExpensiveOperation());
+                var preferredThread = i % threads;
+                tasks[i] = _priorityScheduler.Run(0, preferredThread, () => ExpensiveOperation());
+            }
+
+            await Task.WhenAll(tasks);
+            double res = 0;
+            for (var i = 0; i < tasks.Length; ++i)
+            {
+                res += tasks[i].Result;
+            }
+
+            return res;
+        }
+
+        [Benchmark]
+        public async Task<double> SchedulerRunPrio()
+        {
+            var tasks = new Task<double>[NumJobs];
+            var threads = Environment.ProcessorCount;
+            for (var i = 0; i < tasks.Length; ++i)
+            {
+                var preferredThread = i % threads;
+                var priority = i % 3;
+                tasks[i] = _priorityScheduler.Run(priority, preferredThread, () => ExpensiveOperation());
             }
 
             await Task.WhenAll(tasks);
@@ -76,6 +101,7 @@ namespace PriorityDemandScheduler.Benchmark
         {
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource?.Dispose();
+            _priorityScheduler.WaitForShutdown();
         }
 
     }
