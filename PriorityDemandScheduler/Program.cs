@@ -14,7 +14,7 @@ namespace PriorityDemandScheduler
             using var cts = new CancellationTokenSource();
 
             int N = 500;
-            var scheduler = new Scheduler(Environment.ProcessorCount, cts.Token);
+            var scheduler = new PriortyScheduler(Environment.ProcessorCount, cts.Token);
 
 
             var workers = Enumerable.Range(0, Environment.ProcessorCount)
@@ -78,11 +78,15 @@ namespace PriorityDemandScheduler
             await Task.WhenAll(workerTasks);
             Console.WriteLine("Shutdown complete");
 
+            var offMainThreadCount = 0;
             foreach (var c in counts)
             {
                 Console.WriteLine(string.Join("\t", c.OrderByDescending(cc => cc.Value)));
+                offMainThreadCount += c.OrderByDescending(cc => cc.Value).Skip(1).Sum(cc => cc.Value);
             }
-            Console.WriteLine($"Total stolen jobs: {scheduler.StolenCount}");
+            var (pref, stol) = scheduler.GetCompletedCounts();
+            Console.WriteLine($"Total {pref+stol}, intended preferred thread {pref}, stolen {stol}");
+            Console.WriteLine($"Number actually executed off preferred thread: {offMainThreadCount}");
         }
     }
 }

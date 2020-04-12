@@ -8,10 +8,10 @@ namespace PriorityDemandScheduler
 {
     public class Worker
     {
-        readonly Scheduler _scheduler;
+        readonly PriortyScheduler _scheduler;
         readonly int _threadIndex;
 
-        public Worker(Scheduler scheduler, int threadIndex)
+        public Worker(PriortyScheduler scheduler, int threadIndex)
         {
             _scheduler = scheduler;
             _threadIndex = threadIndex;

@@ -10,33 +10,17 @@ using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
 {
-    public class PriorityQueue
-    {
-        public readonly int Priority;
-        public Dictionary<int, Queue<Future>> ThreadedJobs;
-
-        public PriorityQueue(int threads, int prio)
-        {
-            Priority = prio;
-
-            ThreadedJobs = new Dictionary<int, Queue<Future>>();
-            for (int i = 0; i < threads; ++i)
-            {
-                ThreadedJobs[i] = new Queue<Future>();
-            }
-        }
-    }
-
-    public class Scheduler
+    public class PriortyScheduler
     {
         readonly object _lk = new object();
         readonly SortedList<int,PriorityQueue> _priorityQueues;
         readonly TaskCompletionSource<Future>[] _waiting;
         readonly int _numThreads;
-        
-        public long StolenCount { get; private set; }
 
-        public Scheduler(int threads, CancellationToken ct)
+        private long _stolenCount;
+        private long _preferredCount;
+
+        public PriortyScheduler(int threads, CancellationToken ct)
         {
             _numThreads = threads;
             _priorityQueues = new SortedList<int, PriorityQueue>();
@@ -82,6 +66,7 @@ namespace PriorityDemandScheduler
                     {
                         returnedFuture = fut;
                         Debug.Assert(fut != null);
+                        _preferredCount++;
                         return true;
                     }
                 }
@@ -95,7 +80,7 @@ namespace PriorityDemandScheduler
                         returnedFuture = fut;
                         Debug.Assert(fut != null);
                         Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
-                        StolenCount++;
+                        _stolenCount++;
                         return true;
                     }
                 }
@@ -162,6 +147,15 @@ namespace PriorityDemandScheduler
 
             // return the task for the job we've just queued
             return fut.CompletionSource.Task;
+        }
+
+        // get completed counts
+        public (long preferred, long stolen) GetCompletedCounts()
+        {
+            lock (_lk)
+            {
+                return (_preferredCount, _stolenCount);
+            }
         }
     }
 }
