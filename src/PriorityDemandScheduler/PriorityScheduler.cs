@@ -145,9 +145,9 @@ namespace PriorityDemandScheduler
             }
         }
 
-        public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function)
+        public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var fut = new Future<T>(function);
+            var fut = new Future<T>(function, cancellationToken);
             lock (_lk)
             {
                 // enqueue the task, creating a new priority class if required

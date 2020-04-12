@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
@@ -14,17 +15,25 @@ namespace PriorityDemandScheduler
     public class Future<T> : Future
     {
         private readonly Func<T> _function;
+        private readonly CancellationToken _cancellationToken;
         private readonly TaskCompletionSource<T> _completionSource;
 
-        public Future(Func<T> function)
+
+        public Future(Func<T> function, CancellationToken cancellationToken)
         {
             _function = function;
+            _cancellationToken = cancellationToken;
             _completionSource = new TaskCompletionSource<T>();
         }
 
         // run synchronously now
         public override void Run()
         {
+            // check if already has cancellation requested
+            if (_cancellationToken.IsCancellationRequested)
+                _completionSource.SetCanceled();
+
+            // otherwise, attempt to run and record exception if it occurs
             try
             {
                 var res = _function();
