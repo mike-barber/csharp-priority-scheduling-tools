@@ -48,7 +48,7 @@ namespace PriorityDemandScheduler
             }
 
             // wait for the workers to spin up (testing)
-            Thread.Sleep(1000);
+            Thread.Sleep(250);
 
             var tasks = new Task<double>[N];
             for (int i = 0; i < N; ++i)
