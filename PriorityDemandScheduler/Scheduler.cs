@@ -84,14 +84,15 @@ namespace PriorityDemandScheduler
                     }
                 }
 
-                // otherwise steal a job for another thread
-                foreach (var q in queue.ThreadedJobs.Values)
+                // otherwise steal a job for another thread, starting with adjacent, round robin
+                for (var i = 1; i < _numThreads; ++i)
                 {
-                    if (q.TryDequeue(out var fut))
+                    var otherThreadIdx = (threadIndex + i) % _numThreads;
+                    if (queue.ThreadedJobs[otherThreadIdx].TryDequeue(out var fut))
                     {
                         returnedFuture = fut;
                         Debug.Assert(fut != null);
-                        Console.WriteLine("Stolen immediate");
+                        Console.WriteLine($"Stolen immediate: {threadIndex} stole job from {otherThreadIdx}");
                         return true;
                     }
                 }
