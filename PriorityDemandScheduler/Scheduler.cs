@@ -101,10 +101,9 @@ namespace PriorityDemandScheduler
         }
 
         // inside lock
-        private List<(Future, TaskCompletionSource<Future>)> AssignJobsToWaiting()
+        private void AssignJobsToWaiting()
         {
             // simple approach -- assign tasks using TryGetNext
-            List<(Future, TaskCompletionSource<Future>)> assignments = null;
             for (var threadIdx = 0; threadIdx < _waiting.Length; ++threadIdx)
             {
                 var wt = _waiting[threadIdx];
@@ -114,17 +113,14 @@ namespace PriorityDemandScheduler
                 // if a job is available, add it to the assignments list
                 if (TryGetNext(threadIdx, out var fut))
                 {
-                    // lazily create assignments list if required
-                    if (assignments == null) 
-                        assignments = new List<(Future, TaskCompletionSource<Future>)>();
-                    // record assignment
-                    assignments.Add((fut, wt));
+                    // asynchronously, on a separate task, set the completion; otherwise it'll continue on this thread
+                    var completion = wt;
+                    var future = fut;
+                    Task.Run(() => completion.SetResult(future));
                     // clear from waiting list
                     _waiting[threadIdx] = null;
                 }
-                
             }
-            return assignments;
         }
 
 
@@ -148,7 +144,6 @@ namespace PriorityDemandScheduler
         public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function)
         {
             var fut = new Future<T>(function);
-            List<(Future, TaskCompletionSource<Future>)> assignments = null;
             lock (_lk)
             {
                 // enqueue the task, creating a new priority class if required
@@ -159,21 +154,7 @@ namespace PriorityDemandScheduler
                 queue.ThreadedJobs[threadAffinity].Enqueue(fut);
 
                 // assign queued jobs to any workers waiting, but don't apply while we're still in the lock
-                assignments = AssignJobsToWaiting();
-            }
-
-            if (assignments != null)
-            {
-                // now apply results to waiting jobs (outside the lock)
-                foreach (var (f, tcs) in assignments)
-                {
-                    //tcs.SetResult(f);
-                    // notify task completions: asynchronously, otherwise we just land up running them 
-                    // on this thread
-                    var completion = tcs;
-                    var future = f;
-                    Task.Run(() => completion.SetResult(future));
-                }
+                AssignJobsToWaiting();
             }
 
             // return the task for the job we've just queued
