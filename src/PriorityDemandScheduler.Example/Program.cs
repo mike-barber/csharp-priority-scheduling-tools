@@ -14,22 +14,8 @@ namespace PriorityDemandScheduler.Example
             using var cts = new CancellationTokenSource();
 
             int N = 500;
-            var scheduler = new PriortyScheduler(Environment.ProcessorCount, cts.Token);
+            var scheduler = new PriorityScheduler(Environment.ProcessorCount, cts.Token);
 
-
-            var workers = Enumerable.Range(0, Environment.ProcessorCount)
-                .Select(idx => new Worker(scheduler, idx))
-                .ToArray();
-
-            //Console.WriteLine($"Main thread ID: {Thread.CurrentThread.ManagedThreadId}");
-            var workerTasks = workers
-                .Select(w =>
-                {
-                    var worker = w;
-                    var task = Task.Factory.StartNew(() => worker.RunLoop(cts.Token), TaskCreationOptions.LongRunning);
-                    return task;
-                })
-                .ToArray();
 
             // counts
             var counts = new SortedList<int, int>[Environment.ProcessorCount];
@@ -75,7 +61,7 @@ namespace PriorityDemandScheduler.Example
             Console.WriteLine("All tasks complete; shutting down");
             cts.Cancel();
 
-            await Task.WhenAll(workerTasks);
+            await scheduler.WaitForShutdown();
             Console.WriteLine("Shutdown complete");
 
             var offMainThreadCount = 0;

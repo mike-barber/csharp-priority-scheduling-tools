@@ -10,21 +10,41 @@ using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
 {
-    public class PriortyScheduler
+    public class PriorityScheduler
     {
         readonly object _lk = new object();
+        readonly int _numThreads;
         readonly SortedList<int,PriorityQueue> _priorityQueues;
         readonly TaskCompletionSource<Future>[] _waiting;
-        readonly int _numThreads;
+        readonly Worker[] _workers;
+        readonly Task<Task>[] _workerTasks;
+
 
         private long _stolenCount;
         private long _preferredCount;
 
-        public PriortyScheduler(int threads, CancellationToken ct)
+        
+
+        public PriorityScheduler(int threads, CancellationToken ct)
         {
             _numThreads = threads;
             _priorityQueues = new SortedList<int, PriorityQueue>();
             _waiting = new TaskCompletionSource<Future>[threads];
+
+            // create workers
+            _workers = Enumerable.Range(0, Environment.ProcessorCount)
+                .Select(idx => new Worker(this, idx))
+                .ToArray();
+
+            // start worker tasks on long-running threads
+            _workerTasks = _workers
+                .Select(w =>
+                {
+                    var worker = w;
+                    var task = Task.Factory.StartNew(() => worker.RunLoop(ct), TaskCreationOptions.LongRunning);
+                    return task;
+                })
+                .ToArray();
 
             // cancel all waiting jobs if the token is triggered
             ct.Register(() => CancelWaits(ct));
@@ -147,6 +167,11 @@ namespace PriorityDemandScheduler
 
             // return the task for the job we've just queued
             return fut.CompletionSource.Task;
+        }
+
+        public Task WaitForShutdown()
+        {
+            return Task.WhenAll(_workerTasks);
         }
 
         // get completed counts
