@@ -21,10 +21,6 @@ namespace PriorityDemandScheduler
                 .Select(idx => new Worker(scheduler, idx))
                 .ToArray();
 
-            //var workerTasks = workers
-            //    .Select(w => Task.Run(() => w.RunLoop(cts.Token)))
-            //    .ToArray();
-
             //Console.WriteLine($"Main thread ID: {Thread.CurrentThread.ManagedThreadId}");
             var workerTasks = workers
                 .Select(w =>
@@ -51,6 +47,8 @@ namespace PriorityDemandScheduler
                 }
             }
 
+            // wait for the workers to spin up (testing)
+            Thread.Sleep(1000);
 
             var tasks = new Task<double>[N];
             for (int i = 0; i < N; ++i)

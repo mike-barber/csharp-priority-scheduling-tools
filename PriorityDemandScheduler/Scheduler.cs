@@ -108,6 +108,9 @@ namespace PriorityDemandScheduler
             {
                 if (wt != null) numWaiting++;
             }
+            if (numWaiting == 0) 
+                return null;
+
             Console.WriteLine($"Waiting: {numWaiting}");
 
             // create list of assignments
@@ -200,15 +203,18 @@ namespace PriorityDemandScheduler
                 assignments = AssignJobsToWaiting();
             }
 
-            // now apply results to waiting jobs (outside the lock)
-            foreach (var (f,tcs) in assignments)
+            if (assignments != null)
             {
-                //tcs.SetResult(f);
-                // notify task completions: asynchronously, otherwise we just land up running them 
-                // on this thread
-                var completion = tcs;
-                var future = f;
-                Task.Run(() => completion.SetResult(future));
+                // now apply results to waiting jobs (outside the lock)
+                foreach (var (f, tcs) in assignments)
+                {
+                    //tcs.SetResult(f);
+                    // notify task completions: asynchronously, otherwise we just land up running them 
+                    // on this thread
+                    var completion = tcs;
+                    var future = f;
+                    Task.Run(() => completion.SetResult(future));
+                }
             }
 
             // return the task for the job we've just queued
