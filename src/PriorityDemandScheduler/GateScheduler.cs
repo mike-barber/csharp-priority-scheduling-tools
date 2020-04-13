@@ -9,11 +9,11 @@ using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
 {
-    public class PriorityGateScheduler
+    public class GateScheduler
     {
         public class PriorityGate : IDisposable
         {
-            private readonly PriorityGateScheduler _scheduler;
+            private readonly GateScheduler _scheduler;
             private readonly CancellationToken _cancellationToken;
 
             public readonly int Prio;
@@ -22,7 +22,7 @@ namespace PriorityDemandScheduler
 
             private SemaphoreSlim _semaphore = new SemaphoreSlim(0, 1);
 
-            internal PriorityGate(PriorityGateScheduler scheduler, int priority, long id, CancellationToken ct)
+            internal PriorityGate(GateScheduler scheduler, int priority, long id, CancellationToken ct)
             {
                 _scheduler = scheduler;
                 _cancellationToken = ct;
@@ -75,7 +75,7 @@ namespace PriorityDemandScheduler
         int _currentActive;
 
 
-        public PriorityGateScheduler(int concurrency)
+        public GateScheduler(int concurrency)
         {
             _concurrency = concurrency;
         }
@@ -202,6 +202,25 @@ namespace PriorityDemandScheduler
 
                 await task;
                 return task.Result;
+            }
+        }
+
+        public async Task GatedRun(int priority, Func<PriorityGate, Task> asyncFunction, CancellationToken ct = default)
+        {
+            // create gate first (for priorisation), then asynchronously run the function, passing the gate to it
+            using (var g = CreateGate(priority, ct))
+            {
+                // capture gate
+                var gate = g;
+
+                var task = Task.Run(async () =>
+                {
+                    // wait until we can start
+                    await gate.PermitYield();
+                    await asyncFunction(gate);
+                }, ct);
+
+                await task;
             }
         }
     }

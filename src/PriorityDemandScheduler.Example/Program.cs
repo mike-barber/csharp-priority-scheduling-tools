@@ -24,7 +24,7 @@ namespace PriorityDemandScheduler.Example
             const int Prios = 3;
             const int PerThread = 20;
 
-            var gateScheduler = new PriorityGateScheduler(Environment.ProcessorCount);
+            var gateScheduler = new GateScheduler(Environment.ProcessorCount);
 
             // counts
             var counts = new SortedList<int, int>[Environment.ProcessorCount];
@@ -104,7 +104,7 @@ namespace PriorityDemandScheduler.Example
             using var cts = new CancellationTokenSource();
 
             int N = 500;
-            var scheduler = new PriorityScheduler(Environment.ProcessorCount, cts.Token);
+            var scheduler = new OrderingScheduler(Environment.ProcessorCount, cts.Token);
 
 
             // counts

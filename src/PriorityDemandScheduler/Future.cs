@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
 {
-    public abstract class Future
+    internal abstract class Future
     {
         public abstract void Run();
     }
 
     // simple future to execute; won't do anything until Run() is called explicitly
-    public class Future<T> : Future
+    internal class Future<T> : Future
     {
         private readonly Func<T> _function;
         private readonly CancellationToken _cancellationToken;

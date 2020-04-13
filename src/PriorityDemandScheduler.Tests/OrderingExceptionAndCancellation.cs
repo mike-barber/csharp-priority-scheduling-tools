@@ -8,7 +8,7 @@ using Xunit;
 namespace PriorityDemandScheduler.Tests
 {
    
-    public class ExceptionAndCancellation
+    public class OrderingExceptionAndCancellation
     {
         public class MyException : Exception
         {
@@ -23,7 +23,7 @@ namespace PriorityDemandScheduler.Tests
         public void ExceptionTest()
         {
             using var cts = new CancellationTokenSource();
-            var scheduler = new PriorityScheduler(NumThreads, cts.Token);
+            var scheduler = new OrderingScheduler(NumThreads, cts.Token);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -71,7 +71,7 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityScheduler(NumThreads, ctsScheduler.Token);
+            var scheduler = new OrderingScheduler(NumThreads, ctsScheduler.Token);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -123,7 +123,7 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityScheduler(NumThreads, ctsScheduler.Token);
+            var scheduler = new OrderingScheduler(NumThreads, ctsScheduler.Token);
 
             int N = 100;
             var tasks = new Task<int>[100];

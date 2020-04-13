@@ -20,7 +20,7 @@ namespace PriorityDemandScheduler.Tests
         public void ExceptionTestAsync()
         {
             using var cts = new CancellationTokenSource();
-            var scheduler = new PriorityGateScheduler(NumThreads);
+            var scheduler = new GateScheduler(NumThreads);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -67,7 +67,7 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityGateScheduler(NumThreads);
+            var scheduler = new GateScheduler(NumThreads);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -124,7 +124,7 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityGateScheduler(NumThreads);
+            var scheduler = new GateScheduler(NumThreads);
 
             int N = 100;
             var tasks = new Task<int>[100];

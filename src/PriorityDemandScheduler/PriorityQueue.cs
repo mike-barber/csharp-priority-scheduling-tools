@@ -4,7 +4,7 @@ using System.Text;
 
 namespace PriorityDemandScheduler
 {
-    public class PriorityQueue
+    internal class PriorityQueue
     {
         public readonly int Priority;
         public Dictionary<int, Queue<Future>> ThreadedJobs;

@@ -6,12 +6,12 @@ using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
 {
-    public class Worker
+    internal class Worker
     {
-        readonly PriorityScheduler _scheduler;
+        readonly OrderingScheduler _scheduler;
         readonly int _threadIndex;
 
-        public Worker(PriorityScheduler scheduler, int threadIndex)
+        public Worker(OrderingScheduler scheduler, int threadIndex)
         {
             _scheduler = scheduler;
             _threadIndex = threadIndex;

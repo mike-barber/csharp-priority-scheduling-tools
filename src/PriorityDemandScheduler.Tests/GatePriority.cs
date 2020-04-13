@@ -9,34 +9,37 @@ using Xunit;
 
 namespace PriorityDemandScheduler.Tests
 {
-    public class Priority
+    public class GatePriority
     {
         [Fact]
         public void LowestPrioNumberCompletesFirst()
         {
             int PrioLevels = 5;
             int NumThreads = 4;
-            int N = 250;
+            int N = 50;
 
-            using var cts = new CancellationTokenSource();
-
-            var scheduler = new PriorityScheduler(NumThreads, cts.Token);
+            var scheduler = new GateScheduler(NumThreads);
 
             // set up 3 sets of prioritised tasks; and queue the least important 
             // (highest prio number) first to make life more difficult.
             Task<(int, int)>[][] tasks = new Task<(int,int)>[PrioLevels][];
             for (int p = PrioLevels - 1; p >= 0; --p)
             {
+                int counter = -1;
                 var prio = p;
 
-                tasks[prio] = Enumerable.Range(0, N).Select(i =>
+                tasks[prio] = Enumerable.Range(0, NumThreads).Select(t =>
                 {
-                    var idx = i;
-                    var thread = i % NumThreads;
-                    return scheduler.Run(prio, thread, () =>
+                    var thread = t;
+                    return scheduler.GatedRun(prio, async gate =>
                     {
-                        Thread.Sleep(10);
-                        return (prio,idx);
+                        int index;
+                        while ((index = Interlocked.Increment(ref counter)) < N)
+                        {
+                            await gate.PermitYield();
+                            await Task.Delay(10);
+                        }
+                        return (prio, thread);
                     });
                 }).ToArray();
             }
@@ -66,8 +69,6 @@ namespace PriorityDemandScheduler.Tests
                 Assert.True(correctOrder);
             }
 
-            cts.Cancel();
-            scheduler.WaitForShutdown();
         }
     }
 }

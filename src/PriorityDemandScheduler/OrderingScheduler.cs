@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace PriorityDemandScheduler
 {
-    public class PriorityScheduler
+    public class OrderingScheduler
     {
         readonly object _lk = new object();
         readonly int _numThreads;
@@ -25,7 +25,7 @@ namespace PriorityDemandScheduler
 
         
 
-        public PriorityScheduler(int threads, CancellationToken ct)
+        public OrderingScheduler(int threads, CancellationToken ct)
         {
             _numThreads = threads;
             _priorityQueues = new SortedList<int, PriorityQueue>();
@@ -128,7 +128,7 @@ namespace PriorityDemandScheduler
         }
 
 
-        public Task<Future> GetNextJob(int threadIndex)
+        internal Task<Future> GetNextJob(int threadIndex)
         {
             lock (_lk)
             {

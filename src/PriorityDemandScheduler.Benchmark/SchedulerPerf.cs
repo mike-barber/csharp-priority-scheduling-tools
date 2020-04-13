@@ -14,13 +14,13 @@ namespace PriorityDemandScheduler.Benchmark
         public int NumJobs = 500;
         public int NumIterations = 250_000;
 
-        private PriorityScheduler _priorityScheduler;
+        private OrderingScheduler _priorityScheduler;
         private CancellationTokenSource _cancellationTokenSource;
 
         public SchedulerPerf()
         {
             _cancellationTokenSource = new CancellationTokenSource();
-            _priorityScheduler = new PriorityScheduler(Environment.ProcessorCount, _cancellationTokenSource.Token);
+            _priorityScheduler = new OrderingScheduler(Environment.ProcessorCount, _cancellationTokenSource.Token);
         }
 
 
