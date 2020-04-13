@@ -87,8 +87,24 @@ namespace PriorityDemandScheduler
                 --_currentActive;
 
                 Console.WriteLine($"Gate removed: {priorityGate}");
-                
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
+                
+                // start a gate that's waiting
+                if (_currentActive < _concurrency)
+                {
+                    foreach (var (prio,list) in _gates)
+                    {
+                        foreach (var (id, gate) in list)
+                        {
+                            if (gate.Waiting)
+                            {
+                                gate.Proceed();
+                                ++_currentActive;
+                                return;   
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -101,9 +117,9 @@ namespace PriorityDemandScheduler
                     _gates[priorityGate.Prio] = gateList = new SortedList<long, PriorityGate>();
                 }
                 gateList[priorityGate.Id] = priorityGate;
-                
+
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
-                
+
                 Console.WriteLine($"Gate added: {priorityGate}");
             }
         }
@@ -122,6 +138,12 @@ namespace PriorityDemandScheduler
                     }
                     Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
                     return Task.CompletedTask;
+                }
+
+                // if gate is already waiting at this point, continue waiting
+                if (priorityGate.Waiting)
+                {
+                    return priorityGate.Halt();
                 }
 
                 // find earlier, more prioritised gate
@@ -153,6 +175,26 @@ namespace PriorityDemandScheduler
         {
             var id = Interlocked.Increment(ref _idCounter);
             return new PriorityGate(this, priority, id);
+        }
+
+        public async Task<T> GatedRun<T>(int priority, Func<PriorityGate, Task<T>> asyncFunction)
+        {
+            // create gate first (for priorisation), then asynchronously run the function, passing the gate to it
+            using (var g = CreateGate(priority))
+            {
+                // capture gate
+                var gate = g;
+
+                var task = Task.Run(async () =>
+                {
+                    // wait until we can start
+                    await gate.PermitYield();
+                    return await asyncFunction(gate);
+                });
+
+                await task;
+                return task.Result;
+            }
         }
     }
 }

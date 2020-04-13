@@ -43,15 +43,15 @@ namespace PriorityDemandScheduler.Example
             }
 
             var tasks = new List<Task<double>>();
-            foreach (var p in Enumerable.Range(0,Prios).Reverse())
+            foreach (var p in Enumerable.Range(0, Prios).Reverse())
             {
                 foreach (var t in Enumerable.Range(0, Environment.ProcessorCount))
                 {
-                    var priority = p;
                     var thread = t;
 
-                    var task = Task.Run(async () =>
+                    var task = gateScheduler.GatedRun(p, async gate =>
                     {
+                        var priority = p;
                         double Expensive()
                         {
                             double acc = 0;
@@ -61,8 +61,6 @@ namespace PriorityDemandScheduler.Example
                             }
                             return acc;
                         }
-
-                        using var gate = gateScheduler.CreateGate(priority);
 
                         double total = 0;
                         for (int i = 0; i < PerThread; ++i)
@@ -77,6 +75,8 @@ namespace PriorityDemandScheduler.Example
                         }
                         return total;
                     });
+
+                    // TODO: Check the unwrap part
                     tasks.Add(task);
                 }
             }
@@ -157,7 +157,7 @@ namespace PriorityDemandScheduler.Example
                 offMainThreadCount += c.OrderByDescending(cc => cc.Value).Skip(1).Sum(cc => cc.Value);
             }
             var (pref, stol) = scheduler.GetCompletedCounts();
-            Console.WriteLine($"Total {pref+stol}, intended preferred thread {pref}, stolen {stol}");
+            Console.WriteLine($"Total {pref + stol}, intended preferred thread {pref}, stolen {stol}");
             Console.WriteLine($"Number actually executed off preferred thread: {offMainThreadCount}");
             Console.WriteLine("--------------------------------------------------------------------------------------------------------");
         }
