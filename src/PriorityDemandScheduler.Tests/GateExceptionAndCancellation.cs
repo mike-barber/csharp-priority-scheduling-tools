@@ -35,7 +35,7 @@ namespace PriorityDemandScheduler.Tests
                 shouldThrows[i] = shouldThrow;
                 tasks[i] = scheduler.GatedRun(prio, async (gate) =>
                 {
-                    await gate.PermitYield();
+                    await gate.WaitToContinueAsync();
 
                     if (shouldThrow)
                         throw new MyException();
@@ -84,7 +84,7 @@ namespace PriorityDemandScheduler.Tests
 
                 tasks[i] = scheduler.GatedRun(prio, async (gate) =>
                 {
-                    await gate.PermitYield();
+                    await gate.WaitToContinueAsync();
 
                     // throw INSIDE task
                     if (shouldCancel)
@@ -144,7 +144,7 @@ namespace PriorityDemandScheduler.Tests
                     // should not be here if we should cancel prior
                     Assert.False(shouldCancel, "throw inside the task; should never get here");
 
-                    await gate.PermitYield();
+                    await gate.WaitToContinueAsync();
 
                     // complete successfully
                     return index;

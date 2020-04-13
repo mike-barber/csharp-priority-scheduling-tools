@@ -106,7 +106,7 @@ namespace PriorityDemandScheduler.Benchmark
                         double total = 0.0;
                         for (var j = 0; j < JobsPerChunk; ++j)
                         {
-                            await gate.PermitYield();
+                            await gate.WaitToContinueAsync();
                             total += ExpensiveOperation();
                         }
                         return total;
@@ -141,7 +141,7 @@ namespace PriorityDemandScheduler.Benchmark
                         double total = 0.0;
                         for (var j = 0; j < JobsPerChunk; ++j)
                         {
-                            await gate.PermitYield();
+                            await gate.WaitToContinueAsync();
                             total += ExpensiveOperation();
                         }
                         return total;

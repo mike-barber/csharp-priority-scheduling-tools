@@ -36,7 +36,7 @@ namespace PriorityDemandScheduler.Tests
                         int index;
                         while ((index = Interlocked.Increment(ref counter)) < N)
                         {
-                            await gate.PermitYield();
+                            await gate.WaitToContinueAsync();
                             await Task.Delay(10);
                         }
                         return (prio, thread);

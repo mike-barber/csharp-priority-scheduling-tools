@@ -40,9 +40,9 @@ namespace PriorityDemandScheduler
                 _semaphore.Dispose();
             }
 
-            public Task PermitYield()
+            public Task WaitToContinueAsync()
             {
-                return _scheduler.PermitYield(this);
+                return _scheduler.WaitToContinueAsync(this);
             }
 
             internal void MarkActive()
@@ -69,7 +69,8 @@ namespace PriorityDemandScheduler
         readonly object _lk = new object();
         readonly int _concurrency;
 
-        // state
+        // Sorted lists are not particularly efficient for insertion, but offer good read efficiency: the latter is more important
+        // in this case, as we'll be checking whether a gate should proceed more often that we will be creating or removing them.
         readonly SortedList<int, SortedList<long, PriorityGate>> _gates = new SortedList<int, SortedList<long, PriorityGate>>();
         long _idCounter = 0;
         int _currentActive;
@@ -122,6 +123,7 @@ namespace PriorityDemandScheduler
         {
             lock (_lk)
             {
+                // add priority strata as required
                 if (!_gates.TryGetValue(priorityGate.Prio, out var gateList))
                 {
                     _gates[priorityGate.Prio] = gateList = new SortedList<long, PriorityGate>();
@@ -135,7 +137,7 @@ namespace PriorityDemandScheduler
             }
         }
 
-        private Task PermitYield(PriorityGate priorityGate)
+        private Task WaitToContinueAsync(PriorityGate priorityGate)
         {
             lock (_lk)
             {
@@ -170,7 +172,8 @@ namespace PriorityDemandScheduler
                         if (id >= priorityGate.Id & gate.Prio == priorityGate.Prio)
                             break;
 
-                        // yield to this task
+                        // yield to this task -- i.e. allow the other gate to proceed, 
+                        // and halt prevent this one from doing so.
                         if (gate.Waiting)
                         {
 #if DEBUG
@@ -183,9 +186,11 @@ namespace PriorityDemandScheduler
                 }
             }
 
+            // no other gates pre-empted this one -- proceed directly.
             return Task.CompletedTask;
         }
 
+        // create a new gate with next id
         private PriorityGate CreateGate(int priority, CancellationToken ct)
         {
             var id = Interlocked.Increment(ref _idCounter);
@@ -203,7 +208,7 @@ namespace PriorityDemandScheduler
                 var task = Task.Run(async () =>
                 {
                     // wait until we can start
-                    await gate.PermitYield();
+                    await gate.WaitToContinueAsync();
                     return await asyncFunction(gate);
                 }, ct);
 
@@ -223,7 +228,7 @@ namespace PriorityDemandScheduler
                 var task = Task.Run(async () =>
                 {
                     // wait until we can start
-                    await gate.PermitYield();
+                    await gate.WaitToContinueAsync();
                     await asyncFunction(gate);
                 }, ct);
 

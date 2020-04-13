@@ -71,7 +71,7 @@ namespace PriorityDemandScheduler.Example
                         for (int i = 0; i < PerThread; ++i)
                         {
                             // yield to higher priority here if required
-                            await gate.PermitYield();
+                            await gate.WaitToContinueAsync();
 
                             // run the expensive operation
                             total += Expensive();
