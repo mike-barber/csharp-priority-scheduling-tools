@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
+using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,6 +12,90 @@ namespace PriorityDemandScheduler.Example
     class Program
     {
         static async Task Main(string[] args)
+        {
+            await ExampleGate();
+            await ExamplePriorityScheduler();
+        }
+
+        static async Task ExampleGate()
+        {
+            using var cts = new CancellationTokenSource();
+
+            const int Prios = 3;
+            const int PerThread = 20;
+
+            var gateScheduler = new PriorityGateScheduler(Environment.ProcessorCount);
+
+            // counts
+            var counts = new SortedList<int, int>[Environment.ProcessorCount];
+            for (int i = 0; i < Environment.ProcessorCount; ++i)
+                counts[i] = new SortedList<int, int>();
+
+            var lk = new object();
+            void AddCount(int affinity, int threadId)
+            {
+                lock (lk)
+                {
+                    var c = counts[affinity];
+                    if (!c.ContainsKey(threadId)) c[threadId] = 0;
+                    c[threadId] += 1;
+                }
+            }
+
+            var tasks = new List<Task<double>>();
+            foreach (var p in Enumerable.Range(0,Prios).Reverse())
+            {
+                foreach (var t in Enumerable.Range(0, Environment.ProcessorCount))
+                {
+                    var priority = p;
+                    var thread = t;
+
+                    var task = Task.Run(async () =>
+                    {
+                        double Expensive()
+                        {
+                            double acc = 0;
+                            for (int x = 0; x < 1e6; ++x)
+                            {
+                                acc += Math.Log(x + 1);
+                            }
+                            return acc;
+                        }
+
+                        using var gate = gateScheduler.CreateGate(priority);
+
+                        double total = 0;
+                        for (int i = 0; i < PerThread; ++i)
+                        {
+                            // yield to higher priority here if required
+                            await gate.PermitYield();
+
+                            // run the expensive operation
+                            total += Expensive();
+                            Console.WriteLine($"Completed task for job {i} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {thread} priority {priority} gate id {gate.Id}");
+                            AddCount(thread, Thread.CurrentThread.ManagedThreadId);
+                        }
+                        return total;
+                    });
+                    tasks.Add(task);
+                }
+            }
+
+            await Task.WhenAll(tasks);
+
+            Console.WriteLine("All tasks complete; shutting down");
+
+            var offMainThreadCount = 0;
+            foreach (var c in counts)
+            {
+                Console.WriteLine(string.Join("\t", c.OrderByDescending(cc => cc.Value)));
+                offMainThreadCount += c.OrderByDescending(cc => cc.Value).Skip(1).Sum(cc => cc.Value);
+            }
+            Console.WriteLine("--------------------------------------------------------------------------------------------------------");
+        }
+
+
+        static async Task ExamplePriorityScheduler()
         {
             using var cts = new CancellationTokenSource();
 
@@ -73,6 +159,7 @@ namespace PriorityDemandScheduler.Example
             var (pref, stol) = scheduler.GetCompletedCounts();
             Console.WriteLine($"Total {pref+stol}, intended preferred thread {pref}, stolen {stol}");
             Console.WriteLine($"Number actually executed off preferred thread: {offMainThreadCount}");
+            Console.WriteLine("--------------------------------------------------------------------------------------------------------");
         }
     }
 }
