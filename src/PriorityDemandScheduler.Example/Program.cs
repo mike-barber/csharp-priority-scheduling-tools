@@ -45,6 +45,10 @@ namespace PriorityDemandScheduler.Example
             var tasks = new List<Task<double>>();
             foreach (var p in Enumerable.Range(0, Prios).Reverse())
             {
+                // add them in slowly -- watch for tasks getting pre-empted by more important ones
+                Thread.Sleep(250);
+                Console.WriteLine($"-- Starting prio {p}");
+
                 foreach (var t in Enumerable.Range(0, Environment.ProcessorCount))
                 {
                     var thread = t;
@@ -52,7 +56,8 @@ namespace PriorityDemandScheduler.Example
                     var task = gateScheduler.GatedRun(p, async gate =>
                     {
                         var priority = p;
-                        double Expensive()
+
+                        static double Expensive()
                         {
                             double acc = 0;
                             for (int x = 0; x < 1e6; ++x)
@@ -76,7 +81,6 @@ namespace PriorityDemandScheduler.Example
                         return total;
                     });
 
-                    // TODO: Check the unwrap part
                     tasks.Add(task);
                 }
             }

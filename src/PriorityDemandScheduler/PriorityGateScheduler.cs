@@ -89,7 +89,7 @@ namespace PriorityDemandScheduler
                 Console.WriteLine($"Gate removed: {priorityGate}");
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
                 
-                // start a gate that's waiting
+                // start highest-priority gate that's waiting
                 if (_currentActive < _concurrency)
                 {
                     foreach (var (prio,list) in _gates)
