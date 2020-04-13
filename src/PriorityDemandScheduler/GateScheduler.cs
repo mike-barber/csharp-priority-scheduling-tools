@@ -93,9 +93,11 @@ namespace PriorityDemandScheduler
                     // only decrease active number if the task was in fact active
                     --_currentActive;
                 }
-                
-                Console.WriteLine($"Gate removed: {priorityGate}");
+
+#if DEBUG
+                //Console.WriteLine($"Gate removed: {priorityGate}");
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
+#endif
                 
                 // start highest-priority gate that's waiting
                 if (_currentActive < _concurrency)
@@ -126,9 +128,10 @@ namespace PriorityDemandScheduler
                 }
                 gateList[priorityGate.Id] = priorityGate;
 
+#if DEBUG
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
-
-                Console.WriteLine($"Gate added: {priorityGate}");
+                //Console.WriteLine($"Gate added: {priorityGate}");
+#endif
             }
         }
 
@@ -144,7 +147,9 @@ namespace PriorityDemandScheduler
                         ++_currentActive;
                         priorityGate.MarkActive();
                     }
+#if DEBUG
                     Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
+#endif
                     return Task.CompletedTask;
                 }
 
@@ -168,7 +173,9 @@ namespace PriorityDemandScheduler
                         // yield to this task
                         if (gate.Waiting)
                         {
-                            Console.WriteLine($"Pre-empting {priorityGate} -> {gate}");
+#if DEBUG
+                            //Console.WriteLine($"Pre-empting {priorityGate} -> {gate}");
+#endif
                             gate.Proceed();
                             return priorityGate.Halt();
                         }

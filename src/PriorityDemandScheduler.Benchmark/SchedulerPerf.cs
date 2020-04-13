@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Microsoft.Diagnostics.Tracing.Parsers.Tpl;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -11,16 +12,24 @@ namespace PriorityDemandScheduler.Benchmark
     [MemoryDiagnoser]
     public class SchedulerPerf : IDisposable
     {
-        public int NumJobs = 500;
+        public int PrioLevels = 3;
+
+        public int ChunksPerProcessor = 5;
+        public int JobsPerChunk = 10;
         public int NumIterations = 250_000;
 
-        private OrderingScheduler _priorityScheduler;
+        private OrderingScheduler _orderingScheduler;
+        private GateScheduler _gateScheduler;
+
         private CancellationTokenSource _cancellationTokenSource;
 
         public SchedulerPerf()
         {
             _cancellationTokenSource = new CancellationTokenSource();
-            _priorityScheduler = new OrderingScheduler(Environment.ProcessorCount, _cancellationTokenSource.Token);
+            _orderingScheduler = new OrderingScheduler(Environment.ProcessorCount, _cancellationTokenSource.Token);
+            _gateScheduler = new GateScheduler(Environment.ProcessorCount);
+
+
         }
 
 
@@ -38,8 +47,8 @@ namespace PriorityDemandScheduler.Benchmark
         [Benchmark]
         public async Task<double> TaskRun()
         {
-            var tasks = new Task<double>[NumJobs];
-            for (var i = 0; i<tasks.Length; ++i)
+            var tasks = new Task<double>[Environment.ProcessorCount * ChunksPerProcessor * JobsPerChunk];
+            for (var i = 0; i < tasks.Length; ++i)
             {
                 tasks[i] = Task.Run(() => ExpensiveOperation());
             }
@@ -55,14 +64,21 @@ namespace PriorityDemandScheduler.Benchmark
         }
 
         [Benchmark]
-        public async Task<double> SchedulerRunNoPrio()
+        public async Task<double> TaskRunAsync()
         {
-            var tasks = new Task<double>[NumJobs];
-            var threads = Environment.ProcessorCount;
+            Task NoWait()
+            {
+                return Task.CompletedTask;
+            }
+
+            var tasks = new Task<double>[Environment.ProcessorCount * ChunksPerProcessor * JobsPerChunk];
             for (var i = 0; i < tasks.Length; ++i)
             {
-                var preferredThread = i % threads;
-                tasks[i] = _priorityScheduler.Run(0, preferredThread, () => ExpensiveOperation());
+                tasks[i] = Task.Run(async () =>
+                {
+                    await NoWait();
+                    return ExpensiveOperation();
+                });
             }
 
             await Task.WhenAll(tasks);
@@ -76,15 +92,104 @@ namespace PriorityDemandScheduler.Benchmark
         }
 
         [Benchmark]
-        public async Task<double> SchedulerRunPrio()
+        public async Task<double> GateNoPrio()
         {
-            var tasks = new Task<double>[NumJobs];
+            var threads = Environment.ProcessorCount;
+            var tasks = new List<Task<double>>(threads * ChunksPerProcessor);
+
+            for (var c = 0; c < ChunksPerProcessor; ++c)
+            {
+                for (var i = 0; i < threads; ++i)
+                {
+                    tasks.Add(_gateScheduler.GatedRun(0, async gate =>
+                    {
+                        double total = 0.0;
+                        for (var j = 0; j < JobsPerChunk; ++j)
+                        {
+                            await gate.PermitYield();
+                            total += ExpensiveOperation();
+                        }
+                        return total;
+                    }));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            double res = 0;
+            for (var i = 0; i < tasks.Count; ++i)
+            {
+                res += tasks[i].Result;
+            }
+
+            return res;
+        }
+
+        [Benchmark]
+        public async Task<double> GatePrio()
+        {
+            var threads = Environment.ProcessorCount;
+            var tasks = new List<Task<double>>(threads * ChunksPerProcessor);
+
+            for (var c = 0; c < ChunksPerProcessor; ++c)
+            {
+                for (var i = 0; i < threads; ++i)
+                {
+                    var prio = c % PrioLevels;
+
+                    tasks.Add(_gateScheduler.GatedRun(prio, async gate =>
+                    {
+                        double total = 0.0;
+                        for (var j = 0; j < JobsPerChunk; ++j)
+                        {
+                            await gate.PermitYield();
+                            total += ExpensiveOperation();
+                        }
+                        return total;
+                    }));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            double res = 0;
+            for (var i = 0; i < tasks.Count; ++i)
+            {
+                res += tasks[i].Result;
+            }
+
+            return res;
+        }
+
+        [Benchmark]
+        public async Task<double> OrderingNoPrio()
+        {
+            var tasks = new Task<double>[Environment.ProcessorCount * ChunksPerProcessor * JobsPerChunk];
             var threads = Environment.ProcessorCount;
             for (var i = 0; i < tasks.Length; ++i)
             {
                 var preferredThread = i % threads;
-                var priority = i % 3;
-                tasks[i] = _priorityScheduler.Run(priority, preferredThread, () => ExpensiveOperation());
+                tasks[i] = _orderingScheduler.Run(0, preferredThread, () => ExpensiveOperation());
+            }
+
+            await Task.WhenAll(tasks);
+            double res = 0;
+            for (var i = 0; i < tasks.Length; ++i)
+            {
+                res += tasks[i].Result;
+            }
+
+            return res;
+        }
+
+        [Benchmark]
+        public async Task<double> OrderingPrio()
+        {
+            var tasks = new Task<double>[Environment.ProcessorCount * ChunksPerProcessor * JobsPerChunk];
+            var threads = Environment.ProcessorCount;
+            for (var i = 0; i < tasks.Length; ++i)
+            {
+                var preferredThread = i % threads;
+                var priority = i % PrioLevels;
+                tasks[i] = _orderingScheduler.Run(priority, preferredThread, () => ExpensiveOperation());
             }
 
             await Task.WhenAll(tasks);
@@ -102,7 +207,7 @@ namespace PriorityDemandScheduler.Benchmark
         {
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource?.Dispose();
-            _priorityScheduler.WaitForShutdown();
+            _orderingScheduler.WaitForShutdown();
         }
 
     }
