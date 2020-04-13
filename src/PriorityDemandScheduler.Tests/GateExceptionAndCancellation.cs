@@ -17,7 +17,7 @@ namespace PriorityDemandScheduler.Tests
         int NumThreads = 4;
 
         [Fact]
-        public void ExceptionTest()
+        public void ExceptionTestAsync()
         {
             using var cts = new CancellationTokenSource();
             var scheduler = new PriorityGateScheduler(NumThreads);
@@ -60,7 +60,7 @@ namespace PriorityDemandScheduler.Tests
 
 
         [Fact]
-        public void TaskCancellationTest()
+        public void TaskCancellationTestAsync()
         {
             using var ctsScheduler = new CancellationTokenSource();
 
@@ -99,10 +99,13 @@ namespace PriorityDemandScheduler.Tests
             {
                 if (shouldCancels[i])
                 {
-                    // task should be cancelled WHILE running, meaning it's FAULTED, not CANCELLED
+                    // task should be cancelled WHILE running.
+                    // NOTE: in the async case, we expect the task to be CANCELLED, not FAULTED, even though 
+                    //       the exception was thrown from the task itself; this contradicts the non-async task
+                    //       case. This matches the behaviour of Task.Run(async () xxx)
                     Assert.Throws<OperationCanceledException>(() => tasks[i].GetAwaiter().GetResult());
-                    Assert.False(tasks[i].IsCanceled);
-                    Assert.True(tasks[i].IsFaulted);
+                    Assert.True(tasks[i].IsCanceled);
+                    Assert.False(tasks[i].IsFaulted);
                 }
                 else
                 {
@@ -114,7 +117,7 @@ namespace PriorityDemandScheduler.Tests
         }
 
         [Fact]
-        public void PreCancellationTest()
+        public void PreCancellationTestAsync()
         {
             using var ctsScheduler = new CancellationTokenSource();
 
@@ -138,12 +141,10 @@ namespace PriorityDemandScheduler.Tests
                 var cancellationToken = shouldCancel ? token : CancellationToken.None;
                 tasks[i] = scheduler.GatedRun(prio, async (gate) =>
                 {
-                    // should not get here if the task is cancelled
-                    await gate.PermitYield();
+                    // should not be here if we should cancel prior
+                    Assert.False(shouldCancel, "throw inside the task; should never get here");
 
-                    // throw inside the task; should never get here
-                    if (shouldCancel)
-                        token.ThrowIfCancellationRequested();
+                    await gate.PermitYield();
 
                     // complete successfully
                     return index;

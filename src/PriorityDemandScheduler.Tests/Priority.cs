@@ -16,7 +16,7 @@ namespace PriorityDemandScheduler.Tests
         {
             int PrioLevels = 5;
             int NumThreads = 4;
-            int N = 500;
+            int N = 250;
 
             using var cts = new CancellationTokenSource();
 
@@ -35,7 +35,7 @@ namespace PriorityDemandScheduler.Tests
                     var thread = i % NumThreads;
                     return scheduler.Run(prio, thread, () =>
                     {
-                        Thread.Sleep(1);
+                        Thread.Sleep(10);
                         return (prio,idx);
                     });
                 }).ToArray();
@@ -59,9 +59,11 @@ namespace PriorityDemandScheduler.Tests
             // earlier in the array is revealed as an issue.
             Array.Reverse(joins);
             Task.WaitAll(joins);
+            Console.WriteLine("Completion times: " + string.Join(",", completeTicks));
             for (int i = 1; i < PrioLevels; ++i)
             {
-                Assert.True(completeTicks[i] > completeTicks[i - 1]);
+                var correctOrder = completeTicks[i] > completeTicks[i - 1];
+                Assert.True(correctOrder);
             }
 
             cts.Cancel();

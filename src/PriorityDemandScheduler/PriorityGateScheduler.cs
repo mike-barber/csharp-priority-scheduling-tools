@@ -86,9 +86,13 @@ namespace PriorityDemandScheduler
             {
                 _gates[priorityGate.Prio].Remove(priorityGate.Id);
 
-                // Gate can only be removed if it was active -- otherwise it won't proceed 
-                Debug.Assert(!priorityGate.Waiting);
-                --_currentActive;
+                // Gate can be removed even if it is inactive -- this will happen if a cancellation
+                // token has been cancelled before the task even starts. 
+                if (!priorityGate.Waiting)
+                {
+                    // only decrease active number if the task was in fact active
+                    --_currentActive;
+                }
                 
                 Console.WriteLine($"Gate removed: {priorityGate}");
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
@@ -194,7 +198,7 @@ namespace PriorityDemandScheduler
                     // wait until we can start
                     await gate.PermitYield();
                     return await asyncFunction(gate);
-                });
+                }, ct);
 
                 await task;
                 return task.Result;
