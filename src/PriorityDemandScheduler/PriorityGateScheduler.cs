@@ -13,16 +13,20 @@ namespace PriorityDemandScheduler
     {
         public class PriorityGate : IDisposable
         {
-            PriorityGateScheduler _scheduler;
+            private readonly PriorityGateScheduler _scheduler;
+            private readonly CancellationToken _cancellationToken;
+
             public readonly int Prio;
             public readonly long Id;
             public bool Waiting { get; private set; }
 
             private SemaphoreSlim _semaphore = new SemaphoreSlim(0, 1);
 
-            internal PriorityGate(PriorityGateScheduler scheduler, int priority, long id)
+            internal PriorityGate(PriorityGateScheduler scheduler, int priority, long id, CancellationToken ct)
             {
                 _scheduler = scheduler;
+                _cancellationToken = ct;
+
                 Waiting = true;
                 Prio = priority;
                 Id = id;
@@ -55,7 +59,7 @@ namespace PriorityDemandScheduler
             internal Task Halt()
             {
                 Waiting = true;
-                return _semaphore.WaitAsync();
+                return _semaphore.WaitAsync(_cancellationToken);
             }
 
             public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} waiting {Waiting}]";
@@ -85,7 +89,7 @@ namespace PriorityDemandScheduler
                 // Gate can only be removed if it was active -- otherwise it won't proceed 
                 Debug.Assert(!priorityGate.Waiting);
                 --_currentActive;
-
+                
                 Console.WriteLine($"Gate removed: {priorityGate}");
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
                 
@@ -171,16 +175,16 @@ namespace PriorityDemandScheduler
             return Task.CompletedTask;
         }
 
-        public PriorityGate CreateGate(int priority)
+        private PriorityGate CreateGate(int priority, CancellationToken ct)
         {
             var id = Interlocked.Increment(ref _idCounter);
-            return new PriorityGate(this, priority, id);
+            return new PriorityGate(this, priority, id, ct);
         }
 
-        public async Task<T> GatedRun<T>(int priority, Func<PriorityGate, Task<T>> asyncFunction)
+        public async Task<T> GatedRun<T>(int priority, Func<PriorityGate, Task<T>> asyncFunction, CancellationToken ct = default)
         {
             // create gate first (for priorisation), then asynchronously run the function, passing the gate to it
-            using (var g = CreateGate(priority))
+            using (var g = CreateGate(priority, ct))
             {
                 // capture gate
                 var gate = g;

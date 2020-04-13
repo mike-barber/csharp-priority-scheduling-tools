@@ -7,23 +7,20 @@ using Xunit;
 
 namespace PriorityDemandScheduler.Tests
 {
-   
-    public class ExceptionAndCancellation
+    public class GateExceptionAndCancellation
     {
         public class MyException : Exception
         {
             public MyException() { }
         }
 
-
         int NumThreads = 4;
-
 
         [Fact]
         public void ExceptionTest()
         {
             using var cts = new CancellationTokenSource();
-            var scheduler = new PriorityScheduler(NumThreads, cts.Token);
+            var scheduler = new PriorityGateScheduler(NumThreads);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -36,8 +33,10 @@ namespace PriorityDemandScheduler.Tests
                 var shouldThrow = i % 5 == 0;
 
                 shouldThrows[i] = shouldThrow;
-                tasks[i] = scheduler.Run(prio, thread, () =>
+                tasks[i] = scheduler.GatedRun(prio, async (gate) =>
                 {
+                    await gate.PermitYield();
+
                     if (shouldThrow)
                         throw new MyException();
 
@@ -57,9 +56,6 @@ namespace PriorityDemandScheduler.Tests
                     Assert.Equal(i, tasks[i].Result);
                 }
             }
-
-            cts.Cancel();
-            scheduler.WaitForShutdown();
         }
 
 
@@ -71,7 +67,7 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityScheduler(NumThreads, ctsScheduler.Token);
+            var scheduler = new PriorityGateScheduler(NumThreads);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -85,8 +81,11 @@ namespace PriorityDemandScheduler.Tests
                 var token = ctsTask.Token;
 
                 shouldCancels[i] = shouldCancel;
-                tasks[i] = scheduler.Run(prio, thread, () =>
+
+                tasks[i] = scheduler.GatedRun(prio, async (gate) =>
                 {
+                    await gate.PermitYield();
+
                     // throw INSIDE task
                     if (shouldCancel)
                         token.ThrowIfCancellationRequested();
@@ -112,7 +111,6 @@ namespace PriorityDemandScheduler.Tests
             }
 
             ctsScheduler.Cancel();
-            scheduler.WaitForShutdown();
         }
 
         [Fact]
@@ -123,7 +121,7 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityScheduler(NumThreads, ctsScheduler.Token);
+            var scheduler = new PriorityGateScheduler(NumThreads);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -138,10 +136,14 @@ namespace PriorityDemandScheduler.Tests
 
                 shouldCancels[i] = shouldCancel;
                 var cancellationToken = shouldCancel ? token : CancellationToken.None;
-                tasks[i] = scheduler.Run(prio, thread, () =>
+                tasks[i] = scheduler.GatedRun(prio, async (gate) =>
                 {
-                    // should not be here if we should cancel prior
-                    Assert.False(shouldCancel, "throw inside the task; should never get here");
+                    // should not get here if the task is cancelled
+                    await gate.PermitYield();
+
+                    // throw inside the task; should never get here
+                    if (shouldCancel)
+                        token.ThrowIfCancellationRequested();
 
                     // complete successfully
                     return index;
@@ -167,7 +169,6 @@ namespace PriorityDemandScheduler.Tests
             }
 
             ctsScheduler.Cancel();
-            scheduler.WaitForShutdown();
         }
     }
 }

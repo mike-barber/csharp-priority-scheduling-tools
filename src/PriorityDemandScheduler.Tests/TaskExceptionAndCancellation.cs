@@ -7,23 +7,17 @@ using Xunit;
 
 namespace PriorityDemandScheduler.Tests
 {
-   
-    public class ExceptionAndCancellation
+    public class TaskExceptionAndCancellation
     {
         public class MyException : Exception
         {
             public MyException() { }
         }
 
-
-        int NumThreads = 4;
-
-
         [Fact]
         public void ExceptionTest()
         {
             using var cts = new CancellationTokenSource();
-            var scheduler = new PriorityScheduler(NumThreads, cts.Token);
 
             int N = 100;
             var tasks = new Task<int>[100];
@@ -32,11 +26,10 @@ namespace PriorityDemandScheduler.Tests
             {
                 var index = i;
                 var prio = i % 3;
-                var thread = i % NumThreads;
                 var shouldThrow = i % 5 == 0;
 
                 shouldThrows[i] = shouldThrow;
-                tasks[i] = scheduler.Run(prio, thread, () =>
+                tasks[i] = Task.Run(() =>
                 {
                     if (shouldThrow)
                         throw new MyException();
@@ -57,9 +50,6 @@ namespace PriorityDemandScheduler.Tests
                     Assert.Equal(i, tasks[i].Result);
                 }
             }
-
-            cts.Cancel();
-            scheduler.WaitForShutdown();
         }
 
 
@@ -71,8 +61,6 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityScheduler(NumThreads, ctsScheduler.Token);
-
             int N = 100;
             var tasks = new Task<int>[100];
             var shouldCancels = new bool[100];
@@ -80,12 +68,12 @@ namespace PriorityDemandScheduler.Tests
             {
                 var index = i;
                 var prio = i % 3;
-                var thread = i % NumThreads;
                 var shouldCancel = i % 5 == 0;
                 var token = ctsTask.Token;
 
                 shouldCancels[i] = shouldCancel;
-                tasks[i] = scheduler.Run(prio, thread, () =>
+
+                tasks[i] = Task.Run(() =>
                 {
                     // throw INSIDE task
                     if (shouldCancel)
@@ -112,7 +100,6 @@ namespace PriorityDemandScheduler.Tests
             }
 
             ctsScheduler.Cancel();
-            scheduler.WaitForShutdown();
         }
 
         [Fact]
@@ -123,8 +110,6 @@ namespace PriorityDemandScheduler.Tests
             using var ctsTask = new CancellationTokenSource();
             ctsTask.Cancel();
 
-            var scheduler = new PriorityScheduler(NumThreads, ctsScheduler.Token);
-
             int N = 100;
             var tasks = new Task<int>[100];
             var shouldCancels = new bool[100];
@@ -132,13 +117,12 @@ namespace PriorityDemandScheduler.Tests
             {
                 var index = i;
                 var prio = i % 3;
-                var thread = i % NumThreads;
                 var shouldCancel = i % 5 == 0;
                 var token = ctsTask.Token;
 
                 shouldCancels[i] = shouldCancel;
                 var cancellationToken = shouldCancel ? token : CancellationToken.None;
-                tasks[i] = scheduler.Run(prio, thread, () =>
+                tasks[i] = Task.Run(() =>
                 {
                     // should not be here if we should cancel prior
                     Assert.False(shouldCancel, "throw inside the task; should never get here");
@@ -167,7 +151,6 @@ namespace PriorityDemandScheduler.Tests
             }
 
             ctsScheduler.Cancel();
-            scheduler.WaitForShutdown();
         }
     }
 }
