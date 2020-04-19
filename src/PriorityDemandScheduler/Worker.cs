@@ -27,6 +27,10 @@ namespace PriorityDemandScheduler
                     var future = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
                     future.Run(); // run it now on this thread
                 }
+                catch (TaskCanceledException)
+                {
+                    // expected when GetNextJob is cancelled during shutdown
+                }
                 catch (Exception exc)
                 {
                     Console.WriteLine($"Caught unexpected exception: {exc}");
