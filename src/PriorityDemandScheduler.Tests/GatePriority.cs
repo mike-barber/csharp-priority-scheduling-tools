@@ -12,7 +12,7 @@ namespace PriorityDemandScheduler.Tests
     public class GatePriority
     {
         [Fact]
-        public void LowestPrioNumberCompletesFirst()
+        public void MutiplePriority_LowestPrioNumberCompletesFirst()
         {
             int PrioLevels = 5;
             int NumThreads = 4;
@@ -68,7 +68,52 @@ namespace PriorityDemandScheduler.Tests
                 var correctOrder = completeTicks[i] > completeTicks[i - 1];
                 Assert.True(correctOrder);
             }
+        }
 
+        [Fact]
+        public async Task SinglePriority_TasksCompleteInOrder()
+        {
+            var scheduler = new GateScheduler(1);
+
+            var syncStart = new TaskCompletionSource<int>();
+            object lk = new object();
+            var completionOrder = new List<int>();
+
+            var t0 = scheduler.GatedRun(0, async gate => 
+            {
+                await syncStart.Task;
+                await gate.WaitToContinueAsync();
+                lock (lk)
+                {
+                    completionOrder.Add(0);
+                }
+            });
+            var t1 = scheduler.GatedRun(0, async gate =>
+            {
+                await syncStart.Task;
+                await gate.WaitToContinueAsync();
+                lock (lk)
+                {
+                    completionOrder.Add(1);
+                }
+            });
+            var t2 = scheduler.GatedRun(0, async gate =>
+            {
+                await syncStart.Task;
+                await gate.WaitToContinueAsync();
+                lock (lk)
+                {
+                    completionOrder.Add(2);
+                }
+            });
+
+            // now release all to start, and wait for them to finish
+            syncStart.SetResult(0);
+            await Task.WhenAll(t0, t1, t2);
+
+            Assert.Equal(0, completionOrder[0]);
+            Assert.Equal(1, completionOrder[1]);
+            Assert.Equal(2, completionOrder[2]);
         }
     }
 }
