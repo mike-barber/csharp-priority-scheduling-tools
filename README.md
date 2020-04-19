@@ -1,4 +1,4 @@
-# Job prioritisation schedulering tools
+# C# Job priority scheduling tools
 
 Priorities are supplied as integers, with lower numbers having priority over higher numbers. So for a three-class problem, you'd could have:
 

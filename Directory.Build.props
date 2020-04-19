@@ -1,0 +1,11 @@
+<Project>
+
+  <PropertyGroup>
+    <Version>0.5.0</Version>
+    <Authors>Michael Barber</Authors>
+    <RepositoryUrl>https://github.com/mike-barber/csharp-priority-scheduling-tools</RepositoryUrl>
+    <Description>Priority Scheduling tools for C#</Description>
+    <Copyright>2020 Michael Barber</Copyright>
+  </PropertyGroup>
+
+</Project>
