@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PriorityDemandScheduler
+namespace PrioritySchedulingTools
 {
     internal class Worker
     {

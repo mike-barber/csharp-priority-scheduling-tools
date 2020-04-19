@@ -7,7 +7,7 @@ using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PriorityDemandScheduler.Example
+namespace PrioritySchedulingTools.Example
 {
     class Program
     {

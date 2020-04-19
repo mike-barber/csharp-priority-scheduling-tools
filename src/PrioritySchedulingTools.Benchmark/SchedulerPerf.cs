@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 
-namespace PriorityDemandScheduler.Benchmark
+namespace PrioritySchedulingTools.Benchmark
 {
     [MemoryDiagnoser]
     public class SchedulerPerf : IDisposable

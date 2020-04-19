@@ -3,7 +3,7 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using System;
 
-namespace PriorityDemandScheduler.Benchmark
+namespace PrioritySchedulingTools.Benchmark
 {
     class Program
     {

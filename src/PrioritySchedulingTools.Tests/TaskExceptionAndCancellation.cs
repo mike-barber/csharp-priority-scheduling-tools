@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PriorityDemandScheduler.Tests
+namespace PrioritySchedulingTools.Tests
 {
     /// <summary>
     /// Baseline reference for Task.Run

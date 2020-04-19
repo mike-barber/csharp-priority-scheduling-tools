@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PriorityDemandScheduler.Tests
+namespace PrioritySchedulingTools.Tests
 {
     public class GatePriority
     {
