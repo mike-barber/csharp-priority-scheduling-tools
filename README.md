@@ -1,18 +1,20 @@
-# Job prioritisation schedulers
+# Job prioritisation schedulering tools
 
-Priorities are supplied as integers, with lower numbers having priority over higher numbers. So for a three-class problem, you'd have:
+Priorities are supplied as integers, with lower numbers having priority over higher numbers. So for a three-class problem, you'd could have:
 
 0. High Priority
 1. Medium Priority
 2. Low Priority
 
+You're free to use these any way you'd like, including negative numbers. However, a new queue is created for each new class, and is included in the scan for the most prioritised item, so having more than a few will lead to performance issues.
+
 ## `GatedScheduler`
 
-The `GatedScheduler` allows you to run up to `N` concurrent tasks with as many priorities as required.
+The `GatedScheduler` allows you to run up to `N` concurrent tasks with as many priorities as required. 
 
-The idea here is that the tasks can run for some time, but are *interruptible*. The scheduler will give you a `gate`, and you call `await gate.WaitToContinueAsync();` inside your task. If this task can proceed immediately, it does. 
+Rather than handling the actual scheduling of tasks directly, the idea is that tasks are *interruptible*. The scheduler will give you a `gate`, and you call `await gate.WaitToContinueAsync();` inside your task. If this task can proceed immediately, it does. If another more important gate is waiting, you'll be delayed until it is complete, and the more important task will be allowed to proceed instead.
 
-If another more important gate is waiting, you'll be delayed until it is complete, and the more important task will be allowed to proceed instead.
+Tasks can run for some time, and you can insert several gate checks at various points as required. They're not free, given that the scheduler checks for other more important tasks and requires synchronisation, so you want to aim for some degree of chunkiness in the work you're doing between checks.
 
 ```C#
 var tasks = new List<Task<double>>(threads * ChunksPerProcessor);
@@ -26,6 +28,7 @@ for (var c = 0; c < ChunksPerProcessor; ++c)
             double total = 0.0;
             for (var j = 0; j < JobsPerChunk; ++j)
             {
+                // conditionally stop execution and let another task proceed
                 await gate.WaitToContinueAsync();
                 total += ExpensiveOperation();
             }
@@ -37,9 +40,9 @@ for (var c = 0; c < ChunksPerProcessor; ++c)
 
 ## `OrderingScheduler`
 
-The `OrderingScheduler` allows up to `N` concurrent tasks, and each task is assigned a priority and a preferred thread. This works well for a large number of queued tasks that don't have much context.
+The `OrderingScheduler` allows up to `N` concurrent tasks, and each task is assigned a priority and a preferred thread. This works well for a large number of queued tasks that don't have much context, and is designed to work similarly to `Task.Run` for the user.
 
-The tasks will be run in priority-order, and on worker tasks that correspond to the thread, which helps to reduce context switching.
+The tasks will be run in priority-order, and on worker tasks that correspond to the "thread"; there are `N` worker tasks that the scheduler runs, and supplied tasks are run by these worker tasks, preferentially on the supplied "thread". This helps to reduce context switching. Of course, the actual threads are handled by .net, so may be migrated across cores.
 
 Within a given priority level, the tasks will be run in FIFO order. 
 
@@ -54,8 +57,10 @@ var tasks = new Task<double>[Environment.ProcessorCount * ChunksPerProcessor * J
 var threads = Environment.ProcessorCount;
 for (var i = 0; i < tasks.Length; ++i)
 {
+    // assign a preferred thread and priority
     var preferredThread = i % threads;
     var priority = i % PrioLevels;
+    // schedule the task to run 
     tasks[i] = orderingScheduler.Run(priority, preferredThread, () => ExpensiveOperation());
 }
 
