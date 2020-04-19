@@ -19,33 +19,20 @@ namespace PriorityDemandScheduler
 
         public async Task RunLoop(CancellationToken ct)
         {
-            Console.WriteLine($"\tWorker {_threadIndex} started on thread {Thread.CurrentThread.ManagedThreadId}...");
+            //Console.WriteLine($"\tWorker {_threadIndex} started on thread {Thread.CurrentThread.ManagedThreadId}...");
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
                     var future = await _scheduler.GetNextJob(_threadIndex).ConfigureAwait(false);
-                    try
-                    {
-                        // run it now on this thread
-                        future.Run();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        Console.WriteLine($"\tWorker {_threadIndex} task cancelled.");
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    Console.WriteLine($"\tWorker {_threadIndex} waiting cancelled");
+                    future.Run(); // run it now on this thread
                 }
                 catch (Exception exc)
                 {
-                    Console.WriteLine($"Caught exception: {exc}");
+                    Console.WriteLine($"Caught unexpected exception: {exc}");
                 }
             }
-            Console.WriteLine($"\tWorker complete: {_threadIndex}");
-            
+            //Console.WriteLine($"\tWorker complete: {_threadIndex}");
         }
     }
 }
