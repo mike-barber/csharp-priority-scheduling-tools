@@ -11,11 +11,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrioritySchedulingTools", "src\PrioritySchedulingTools\PrioritySchedulingTools.csproj", "{5FEE43A9-E514-43C0-AE14-0B6A0E07070E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PriorityScheduling.Example", "src\PrioritySchedulingTools.Example\PriorityScheduling.Example.csproj", "{7F07AAFF-CF9F-4228-82FC-C280B0591E3F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrioritySchedulingTools.Example", "src\PrioritySchedulingTools.Example\PrioritySchedulingTools.Example.csproj", "{7F07AAFF-CF9F-4228-82FC-C280B0591E3F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PriorityScheduling.Benchmark", "src\PrioritySchedulingTools.Benchmark\PriorityScheduling.Benchmark.csproj", "{364820CA-BC16-4D5C-8AEB-319DE3365B09}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrioritySchedulingTools.Benchmark", "src\PrioritySchedulingTools.Benchmark\PrioritySchedulingTools.Benchmark.csproj", "{364820CA-BC16-4D5C-8AEB-319DE3365B09}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PriorityScheduling.Tests", "src\PrioritySchedulingTools.Tests\PriorityScheduling.Tests.csproj", "{53134C7A-D4BF-4820-934F-D725618250A0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrioritySchedulingTools.Tests", "src\PrioritySchedulingTools.Tests\PrioritySchedulingTools.Tests.csproj", "{53134C7A-D4BF-4820-934F-D725618250A0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

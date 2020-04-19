@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/src/PrioritySchedulingTools.Example/PriorityScheduling.Example.csproj",
+                "${workspaceFolder}/src/PrioritySchedulingTools.Example/PrioritySchedulingTools.Example.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/src/PrioritySchedulingTools.Example/PriorityScheduling.Example.csproj",
+                "${workspaceFolder}/src/PrioritySchedulingTools.Example/PrioritySchedulingTools.Example.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -32,7 +32,7 @@
             "args": [
                 "watch",
                 "run",
-                "${workspaceFolder}/src/PrioritySchedulingTools.Example/PriorityScheduling.Example.csproj",
+                "${workspaceFolder}/src/PrioritySchedulingTools.Example/PrioritySchedulingTools.Example.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],

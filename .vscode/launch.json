@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/src/PrioritySchedulingTools.Example/bin/Debug/netcoreapp3.1/PriorityScheduling.Example.dll",
+            "program": "${workspaceFolder}/src/PrioritySchedulingTools.Example/bin/Debug/netcoreapp3.1/PrioritySchedulingTools.Example.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src/PrioritySchedulingTools.Example",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
