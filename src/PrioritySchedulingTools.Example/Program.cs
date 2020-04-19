@@ -13,12 +13,18 @@ namespace PrioritySchedulingTools.Example
     {
         static async Task Main(string[] args)
         {
-            await ExampleGate();
-            await ExamplePriorityScheduler();
+            await ExampleGateScheduler();
+            await ExampleOrderingScheduler();
         }
 
-        static async Task ExampleGate()
+        static async Task ExampleGateScheduler()
         {
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine("GateScheduler...");
+            Console.WriteLine();
+
+
             using var cts = new CancellationTokenSource();
 
             const int Prios = 3;
@@ -99,8 +105,13 @@ namespace PrioritySchedulingTools.Example
         }
 
 
-        static async Task ExamplePriorityScheduler()
+        static async Task ExampleOrderingScheduler()
         {
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine("OrderingScheduler...");
+            Console.WriteLine();
+
             using var cts = new CancellationTokenSource();
 
             int N = 500;
