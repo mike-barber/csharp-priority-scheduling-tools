@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PriorityDemandScheduler\PriorityDemandScheduler.csproj" />
+    <ProjectReference Include="..\PrioritySchedulingTools\PrioritySchedulingTools.csproj" />
   </ItemGroup>
 
 </Project>
