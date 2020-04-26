@@ -123,7 +123,7 @@ namespace PrioritySchedulingTools
         {
             lock (_lk)
             {
-                // add priority strata as required
+                // add priority stratum as required
                 if (!_gates.TryGetValue(priorityGate.Prio, out var gateList))
                 {
                     _gates[priorityGate.Prio] = gateList = new SortedList<long, PriorityGate>();
