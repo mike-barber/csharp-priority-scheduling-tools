@@ -81,7 +81,9 @@ namespace PrioritySchedulingTools
                     if (queue.ThreadedJobs[threadIndex].TryDequeue(out var fut))
                     {
                         returnedFuture = fut;
+#if DIAGNOSTICS
                         Debug.Assert(fut != null);
+#endif
                         _preferredCount++;
                         return true;
                     }
@@ -94,8 +96,10 @@ namespace PrioritySchedulingTools
                     if (queue.ThreadedJobs[otherThreadIdx].TryDequeue(out var fut))
                     {
                         returnedFuture = fut;
+#if DIAGNOSTICS
                         Debug.Assert(fut != null);
-                        //Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
+                        Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
+#endif
                         _stolenCount++;
                         return true;
                     }

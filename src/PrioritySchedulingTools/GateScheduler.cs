@@ -168,9 +168,9 @@ namespace PrioritySchedulingTools
                 // add the gate to the end of the list
                 gateList.Gates.Add(priorityGate);
 
-#if DEBUG
+#if DIAGNOSTICS
                 Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Gates.Count(g => g.CurrentState == State.Active)));
-                Console.WriteLine($"Gate added: {priorityGate}");
+                Console.Error.WriteLine($"Gate added: {priorityGate}");
 #endif
             }
         }
@@ -221,7 +221,7 @@ namespace PrioritySchedulingTools
                         ++_currentActive;
                         priorityGate.Proceed();
                     }
-#if DEBUG
+#if DIAGNOSTICS
                     Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Gates.Count(g => g.CurrentState == State.Active)));
 #endif
                     return Task.CompletedTask;
@@ -233,11 +233,10 @@ namespace PrioritySchedulingTools
                     return priorityGate.Halt();
                 }
 
-                // if gate is already waiting at this point, continue waiting
-                if (priorityGate.CurrentState == State.Waiting)
+                // integrity assertion -- should only be Active at this point
+                if (priorityGate.CurrentState != State.Active)
                 {
-                    Debug.Fail("Should not be here.");
-                    return priorityGate.Halt();
+                    throw new InvalidOperationException($"Gate should be Active at this point, but is {priorityGate.CurrentState}");
                 }
 
                 // only search for more prioritised gate if the list is dirty
@@ -246,8 +245,8 @@ namespace PrioritySchedulingTools
                     _nextWaitingGate = FindNextWaitingGate();
                     _refreshNextWaitingGate = false;
 
-#if DEBUG
-                    Console.WriteLine($"Next waiting gate: {_nextWaitingGate}");
+#if DIAGNOSTICS
+                    Console.Error.WriteLine($"Next waiting gate: {_nextWaitingGate}");
 #endif
                 }
 
@@ -259,8 +258,8 @@ namespace PrioritySchedulingTools
 
                     if (shouldHandOver)
                     {
-#if DEBUG
-                        Console.WriteLine($"Pre-empting {priorityGate} -> {_nextWaitingGate}");
+#if DIAGNOSTICS
+                        Console.Error.WriteLine($"Pre-empting {priorityGate} -> {_nextWaitingGate}");
 #endif
                         _refreshNextWaitingGate = true;
                         _nextWaitingGate.Proceed();
