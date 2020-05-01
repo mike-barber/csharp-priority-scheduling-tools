@@ -16,7 +16,7 @@ namespace PrioritySchedulingTools.Tests
         {
             int PrioLevels = 5;
             int NumThreads = 4;
-            int N = 250;
+            int N = 2500;
 
             using var cts = new CancellationTokenSource();
 
@@ -35,7 +35,7 @@ namespace PrioritySchedulingTools.Tests
                     var thread = i % NumThreads;
                     return scheduler.Run(prio, thread, () =>
                     {
-                        Thread.Sleep(10);
+                        Thread.Sleep(1);
                         return (prio,idx);
                     });
                 }).ToArray();
