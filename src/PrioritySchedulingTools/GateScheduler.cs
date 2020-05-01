@@ -52,15 +52,20 @@ namespace PrioritySchedulingTools
                 return _scheduler.WaitToContinueAsync(this);
             }
 
-            internal void MarkActive()
-            {
-                CurrentState = State.Active;
-            }
-
             internal void Proceed()
             {
-                CurrentState = State.Active;
-                _semaphore.Release();
+                switch (CurrentState)
+                {
+                    case State.BeforeStart:
+                        CurrentState = State.Active;
+                        break;
+                    case State.Waiting:
+                        CurrentState = State.Active;
+                        _semaphore.Release();
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Cannot proceed from state {CurrentState}");
+                }
             }
 
             internal Task Halt()
@@ -181,8 +186,8 @@ namespace PrioritySchedulingTools
                         newStartIndex = i;
                     }
 
-                    // return first waiting gate
-                    if (gate.CurrentState == State.Waiting)
+                    // return first waiting or unstarted gate
+                    if (gate.CurrentState == State.Waiting | gate.CurrentState == State.BeforeStart)
                     {
                         // update start index and trim list if required
                         if (newStartIndex.HasValue)
@@ -209,7 +214,7 @@ namespace PrioritySchedulingTools
                     if (priorityGate.CurrentState == State.BeforeStart)
                     {
                         ++_currentActive;
-                        priorityGate.MarkActive();
+                        priorityGate.Proceed();
                     }
 #if DEBUG
                     Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Gates.Count(g => g.CurrentState == State.Active)));
@@ -252,7 +257,7 @@ namespace PrioritySchedulingTools
 #if DEBUG
                         Console.WriteLine($"Pre-empting {priorityGate} -> {_nextWaitingGate}");
 #endif
-                        _refreshNextWaitingGate = true; 
+                        _refreshNextWaitingGate = true;
                         _nextWaitingGate.Proceed();
                         return priorityGate.Halt();
                     }
