@@ -81,7 +81,7 @@ namespace PrioritySchedulingTools.Example
 
                             // run the expensive operation
                             total += Expensive();
-                            Console.WriteLine($"Completed task for job {i} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {thread} priority {priority} gate id {gate.Id}");
+                            Console.WriteLine($"Completed task for job {priority}/{i} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {thread} priority {priority} gate id {gate.Id}");
                             AddCount(thread, Thread.CurrentThread.ManagedThreadId);
                         }
                         return total;
