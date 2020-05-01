@@ -115,24 +115,23 @@ namespace PrioritySchedulingTools
             _concurrency = concurrency;
         }
 
-        private void RemoveGate(PriorityGate priorityGate)
+        private void CompletedGate(PriorityGate priorityGate)
         {
             lock (_lk)
             {
-                // mark dirty so we do search on next iteration
-                _refreshNextWaitingGate = true;
-
                 // Gate can be removed even if it is inactive -- this will happen if a cancellation
                 // token has been cancelled before the task even starts. 
-                // Only decrease active number if the task was in fact run -- gate will be Completed
-                if (priorityGate.CurrentState == State.Complete)
+                switch (priorityGate.CurrentState)
                 {
-                    --_currentActive;
-                }
-
-                if (priorityGate.CurrentState == State.Active)
-                {
-                    throw new InvalidOperationException("Should not be in this state");
+                    case State.Active:
+                        --_currentActive;
+                        priorityGate.MarkComplete();
+                        break;
+                    case State.BeforeStart:
+                        priorityGate.MarkComplete();
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Invalid transition {priorityGate.CurrentState} -> {State.Complete}");
                 }
 
                 // start highest-priority gate that's waiting
@@ -145,6 +144,9 @@ namespace PrioritySchedulingTools
                         ++_currentActive;
                     }
                 }
+
+                // mark dirty so we do search on next iteration
+                _refreshNextWaitingGate = true;
             }
         }
 
@@ -293,8 +295,7 @@ namespace PrioritySchedulingTools
             }
             finally
             {
-                gate.MarkComplete();
-                RemoveGate(gate);
+                CompletedGate(gate);
             }
         }
 
@@ -315,8 +316,7 @@ namespace PrioritySchedulingTools
             }
             finally
             {
-                gate.MarkComplete();
-                RemoveGate(gate);
+                CompletedGate(gate);
             }
         }
     }
