@@ -42,9 +42,12 @@ namespace PrioritySchedulingTools
                 _scheduler.AddGate(this);
             }
 
-            internal void MarkComplete()
+            internal void Complete()
             {
+                // mark complete and dispose the semaphore
                 CurrentState = State.Complete;
+                _semaphore?.Dispose();
+                _semaphore = null;
             }
 
             public Task WaitToContinueAsync()
@@ -125,10 +128,10 @@ namespace PrioritySchedulingTools
                 {
                     case State.Active:
                         --_currentActive;
-                        priorityGate.MarkComplete();
+                        priorityGate.Complete();
                         break;
                     case State.BeforeStart:
-                        priorityGate.MarkComplete();
+                        priorityGate.Complete();
                         break;
                     default:
                         throw new InvalidOperationException($"Invalid transition {priorityGate.CurrentState} -> {State.Complete}");
