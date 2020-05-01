@@ -77,11 +77,11 @@ namespace PrioritySchedulingTools
             public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} waiting {CurrentState}]";
         }
 
+        public const int TrimListAtSizeCompleted = 256;
+        public const int InitialListSize = 2048;
+
         internal class GateList
         {
-            private const int TrimListSize = 1024;
-            private const int InitialListSize = 2048;
-
             internal int StartIndex;
             internal List<PriorityGate> Gates = new List<PriorityGate>(InitialListSize);
 
@@ -90,7 +90,7 @@ namespace PrioritySchedulingTools
             // as it involves a large copy back of the rest of the array.
             internal void CheckTrimList()
             {
-                if (StartIndex > TrimListSize)
+                if (StartIndex > TrimListAtSizeCompleted)
                 {
                     Gates.RemoveRange(0, StartIndex);
                     StartIndex = 0;
@@ -319,5 +319,15 @@ namespace PrioritySchedulingTools
                 CompletedGate(gate);
             }
         }
+
+        // EXPENSIVE: for debugging and testing
+        public int GetTotalListSize()
+        {
+            lock (_lk)
+            {
+                return _gates.Values.Sum(gl => gl.Gates.Count);
+            }
+        }
+       
     }
 }
