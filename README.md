@@ -8,6 +8,10 @@ Priorities are supplied as integers, with lower numbers having priority over hig
 
 You're free to use these any way you'd like, including negative numbers. However, a new queue is created for each new class, and is included in the scan for the most prioritised item, so having more than a few will lead to performance issues.
 
+## Compute bound 
+
+These tools are specifically designed for compute-bound workloads, especially given the explicit concurrency limits they implement. Do not use them for IO-bound workloads -- you'll cause an artificial bottleneck.
+
 ## `GatedScheduler`
 
 The `GatedScheduler` allows you to run up to `N` concurrent tasks with as many priorities as required. 
@@ -45,6 +49,8 @@ The `OrderingScheduler` allows up to `N` concurrent tasks, and each task is assi
 The tasks will be run in priority-order, and on worker tasks that correspond to the "thread"; there are `N` worker tasks that the scheduler runs, and supplied tasks are run by these worker tasks, preferentially on the supplied "thread". This helps to reduce context switching. Of course, the actual threads are handled by .net, so may be migrated across cores.
 
 Within a given priority level, the tasks will be run in FIFO order. 
+
+Tasks cannot be *async* ones -- they need to be normal synchronous tasks.
 
 Once a thread has exhausted all tasks at its given priority level, it will do the first of these that it can: 
 

@@ -22,6 +22,11 @@ namespace PrioritySchedulingTools.Tests
 
             var scheduler = new OrderingScheduler(NumThreads, cts.Token);
 
+            // use this to synchronise start; we don't support asynchronous tasks, so we
+            // just cause them to block. This is to improve test reliability -- ensure we 
+            // have everything queued before letting them proceed.
+            var syncStart = new ManualResetEventSlim(false);
+
             // set up 3 sets of prioritised tasks; and queue the least important 
             // (highest prio number) first to make life more difficult.
             Task<(int, int)>[][] tasks = new Task<(int,int)>[PrioLevels][];
@@ -35,6 +40,8 @@ namespace PrioritySchedulingTools.Tests
                     var thread = i % NumThreads;
                     return scheduler.Run(prio, thread, () =>
                     {
+                        // wait for start synchronisation
+                        syncStart.Wait();
                         Thread.Sleep(1);
                         return (prio,idx);
                     });
@@ -58,6 +65,11 @@ namespace PrioritySchedulingTools.Tests
             // specifically reverse the joins so that any weirdness where waiting on less important stuff
             // earlier in the array is revealed as an issue.
             Array.Reverse(joins);
+
+            // allow tasks to proceed
+            syncStart.Set();
+
+            // and check completion times
             Task.WaitAll(joins);
             Console.WriteLine("Completion times: " + string.Join(",", completeTicks));
             for (int i = 1; i < PrioLevels; ++i)
