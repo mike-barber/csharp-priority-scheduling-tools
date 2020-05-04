@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -80,33 +78,15 @@ namespace PrioritySchedulingTools
             public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} waiting {CurrentState}]";
         }
 
-        public const int TrimListAtSizeCompleted = 256;
-        public const int InitialListSize = 2048;
-
-        internal class GateList
-        {
-            internal int StartIndex;
-            internal List<PriorityGate> Gates = new List<PriorityGate>(InitialListSize);
-
-            // conditionally remove completed items when we have enough of them; 
-            // it's very inefficient removing items from the start of a list one by one, 
-            // as it involves a large copy back of the rest of the array.
-            internal void CheckTrimList()
-            {
-                if (StartIndex > TrimListAtSizeCompleted)
-                {
-                    Gates.RemoveRange(0, StartIndex);
-                    StartIndex = 0;
-                }
-            }
-        }
-
+        public const int InitialQueueSize = 2048;
+        
         // invariants
         readonly object _lk = new object();
         readonly int _concurrency;
 
-        // using a sorted list for priority; we'll mostly be reading from this.
-        readonly SortedList<int, GateList> _gates = new SortedList<int, GateList>();
+        // using a sorted list for priority; we'll mostly be reading from this; 
+        // gates are in a Queue, which is a circular buffer, and very fast for linear read with an iterator
+        readonly SortedList<int, Queue<PriorityGate>> _gates = new SortedList<int, Queue<PriorityGate>>();
         long _idCounter = 0;
         int _currentActive;
 
@@ -161,15 +141,15 @@ namespace PrioritySchedulingTools
                 _refreshNextWaitingGate = true;
 
                 // add priority stratum as required
-                if (!_gates.TryGetValue(priorityGate.Prio, out var gateList))
+                if (!_gates.TryGetValue(priorityGate.Prio, out var gateQueue))
                 {
-                    _gates[priorityGate.Prio] = gateList = new GateList();
+                    _gates[priorityGate.Prio] = gateQueue = new Queue<PriorityGate>(InitialQueueSize);
                 }
-                // add the gate to the end of the list
-                gateList.Gates.Add(priorityGate);
+                // add the gate to the end of the queue
+                gateQueue.Enqueue(priorityGate);
 
 #if DIAGNOSTICS
-                Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Gates.Count(g => g.CurrentState == State.Active)));
+                Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)));
                 Console.Error.WriteLine($"Gate added: {priorityGate}");
 #endif
             }
@@ -177,30 +157,21 @@ namespace PrioritySchedulingTools
 
         private PriorityGate FindNextWaitingGate()
         {
-            foreach (var list in _gates.Values)
+            foreach (var queue in _gates.Values)
             {
-                var gl = list.Gates;
-                int? newStartIndex = null;
-                for (var i = list.StartIndex; i < gl.Count; ++i)
+                var gq = queue;
+                
+                // remove all completed gates; fewer to search through later, and we free them for GC
+                while (gq.TryPeek(out var g) && g.CurrentState == State.Complete)
                 {
-                    var gate = gl[i];
+                    gq.Dequeue();
+                }
 
-                    // first incomplete item -- this will be our new search starting position
-                    if (!newStartIndex.HasValue && gate.CurrentState != State.Complete)
-                    {
-                        newStartIndex = i;
-                    }
-
-                    // return first waiting or unstarted gate
+                // return first waiting or unstarted gate
+                foreach (var gate in gq)
+                {
                     if (gate.CurrentState == State.Waiting | gate.CurrentState == State.BeforeStart)
                     {
-                        // update start index and trim list if required
-                        if (newStartIndex.HasValue)
-                        {
-                            list.StartIndex = newStartIndex.Value;
-                            list.CheckTrimList();
-                        }
-
                         // return the gate we found
                         return gate;
                     }
@@ -222,7 +193,7 @@ namespace PrioritySchedulingTools
                         priorityGate.Proceed();
                     }
 #if DIAGNOSTICS
-                    Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Gates.Count(g => g.CurrentState == State.Active)));
+                    Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)));
 #endif
                     return Task.CompletedTask;
                 }
@@ -239,7 +210,7 @@ namespace PrioritySchedulingTools
                     throw new InvalidOperationException($"Gate should be Active at this point, but is {priorityGate.CurrentState}");
                 }
 
-                // only search for more prioritised gate if the list is dirty
+                // only search for more prioritised gate if we know something changed
                 if (_refreshNextWaitingGate)
                 {
                     _nextWaitingGate = FindNextWaitingGate();
@@ -323,11 +294,11 @@ namespace PrioritySchedulingTools
         }
 
         // EXPENSIVE: for debugging and testing
-        public int GetTotalListSize()
+        public int GetTotalQueueSize()
         {
             lock (_lk)
             {
-                return _gates.Values.Sum(gl => gl.Gates.Count);
+                return _gates.Values.Sum(gq => gq.Count);
             }
         }
        

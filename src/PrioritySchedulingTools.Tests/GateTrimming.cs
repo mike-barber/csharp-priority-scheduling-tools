@@ -33,9 +33,6 @@ namespace PrioritySchedulingTools.Tests
 
             // wait for all to complete
             await Task.WhenAll(tasks);
-
-            // check list total outstanding size -- should not exceed the TrimListAtSize completed constant
-            Assert.InRange(scheduler.GetTotalListSize(), 0, GateScheduler.TrimListAtSizeCompleted * PrioLevels);
         }
     }
 }
