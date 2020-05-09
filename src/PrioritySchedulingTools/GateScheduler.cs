@@ -76,6 +76,8 @@ namespace PrioritySchedulingTools
             }
 
             public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} waiting {CurrentState}]";
+
+            public (int,long) PrioId { get => (Prio, Id); }
         }
 
         public const int InitialQueueSize = 2048;
@@ -88,7 +90,9 @@ namespace PrioritySchedulingTools
         // gates are in a Queue, which is a circular buffer, and very fast for linear read with an iterator
         readonly SortedList<int, Queue<PriorityGate>> _gates = new SortedList<int, Queue<PriorityGate>>();
         long _idCounter = 0;
-        int _currentActive;
+
+        // keep track of which gates are currently active
+        readonly Dictionary<(int, long), PriorityGate> _activeGates = new Dictionary<(int, long), PriorityGate>();
 
         bool _refreshNextWaitingGate = false;
         PriorityGate _nextWaitingGate = null;
@@ -107,7 +111,7 @@ namespace PrioritySchedulingTools
                 switch (priorityGate.CurrentState)
                 {
                     case State.Active:
-                        --_currentActive;
+                        _activeGates.Remove(priorityGate.PrioId);
                         priorityGate.Complete();
                         break;
                     case State.BeforeStart:
@@ -118,13 +122,13 @@ namespace PrioritySchedulingTools
                 }
 
                 // start highest-priority gate that's waiting
-                if (_currentActive < _concurrency)
+                if (_activeGates.Count < _concurrency)
                 {
                     var nextGate = FindNextWaitingGate();
                     if (nextGate != null)
                     {
                         nextGate.Proceed();
-                        ++_currentActive;
+                        _activeGates.Add(nextGate.PrioId, nextGate);
                     }
                 }
 
@@ -185,12 +189,12 @@ namespace PrioritySchedulingTools
             lock (_lk)
             {
                 // allow up to max concurrency
-                if (_currentActive < _concurrency)
+                if (_activeGates.Count < _concurrency)
                 {
                     if (priorityGate.CurrentState == State.BeforeStart)
                     {
-                        ++_currentActive;
                         priorityGate.Proceed();
+                        _activeGates.Add(priorityGate.PrioId, priorityGate);
                     }
 #if DIAGNOSTICS
                     Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)));
@@ -233,6 +237,10 @@ namespace PrioritySchedulingTools
                         Console.Error.WriteLine($"Pre-empting {priorityGate} -> {_nextWaitingGate}");
 #endif
                         _refreshNextWaitingGate = true;
+                        
+                        _activeGates.Remove(priorityGate.PrioId);
+                        _activeGates.Add(_nextWaitingGate.PrioId, _nextWaitingGate);
+
                         _nextWaitingGate.Proceed();
                         return priorityGate.Halt();
                     }
