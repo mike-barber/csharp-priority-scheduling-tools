@@ -7,16 +7,49 @@ using System.Threading.Tasks;
 
 namespace PrioritySchedulingTools
 {
+    public enum State
+    {
+        BeforeStart,
+        Waiting,
+        Active,
+        Complete
+    };
+
+    public readonly struct PrioId : IEquatable<PrioId>, IComparable<PrioId>
+    {
+        readonly int Prio;
+        readonly long Id;
+
+        public PrioId(int prio, long id)
+        {
+            Prio = prio;
+            Id = id;
+        }
+
+        public int CompareTo(PrioId other)
+        {
+            if (Prio < other.Prio) return -1;
+            if (Prio > other.Prio) return +1;
+            if (Id < other.Id) return -1;
+            if (Id > other.Id) return +1;
+            return 0;
+        }
+
+        public bool Equals(PrioId other)
+        {
+            return Prio == other.Prio & Id == other.Id;
+        }
+
+        public static bool operator >(PrioId a, PrioId b) => a.CompareTo(b) == 1;
+        public static bool operator <(PrioId a, PrioId b) => a.CompareTo(b) == -1;
+        public static bool operator >=(PrioId a, PrioId b) => a.CompareTo(b) >= 0;
+        public static bool operator <=(PrioId a, PrioId b) => a.CompareTo(b) <= 0;
+        public static bool operator ==(PrioId a, PrioId b) => a.Equals(b);
+        public static bool operator !=(PrioId a, PrioId b) => !a.Equals(b);
+    }
+
     public class GateScheduler
     {
-        public enum State
-        {
-            BeforeStart,
-            Waiting,
-            Active,
-            Complete
-        };
-
         public class PriorityGate
         {
             private readonly GateScheduler _scheduler;
@@ -183,6 +216,11 @@ namespace PrioritySchedulingTools
             }
             return null;
         }
+
+        //private PriorityGate FindLeastPrioritisedActiveGate()
+        //{
+
+        //}
 
         private Task WaitToContinueAsync(PriorityGate priorityGate)
         {
