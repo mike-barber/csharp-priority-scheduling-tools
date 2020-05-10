@@ -107,8 +107,7 @@ namespace PrioritySchedulingTools
 
             internal void SetActive()
             {
-                Debug.Assert(CurrentState == State.Wait);
-
+                if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(SetActive)} invalid transition {CurrentState} -> {State.Active}");
                 CurrentState = State.Active;
 
                 // release semaphore if it exists -- i.e. allow the waiting task
@@ -119,17 +118,18 @@ namespace PrioritySchedulingTools
 
             internal void SetWait()
             {
-                Debug.Assert(CurrentState == State.Active);
-
+                if (CurrentState != State.Active) throw new InvalidOperationException($"{nameof(SetWait)} invalid transition {CurrentState} -> {State.Wait}");
                 CurrentState = State.Wait;
             }
 
             internal Task ConditionalHalt()
             {
+                // immediately continue -- we're active
                 if (CurrentState == State.Active)
                     return Task.CompletedTask;
 
-                Debug.Assert(CurrentState == State.Wait);
+                // should be Wait here
+                if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(ConditionalHalt)} invalid state {CurrentState}");
 
                 // create semaphore if not created yet
                 if (_semaphore == null)
