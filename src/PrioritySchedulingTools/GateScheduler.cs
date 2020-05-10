@@ -150,6 +150,8 @@ namespace PrioritySchedulingTools
         readonly object _lk = new object();
         readonly int _concurrency;
 
+        int _monitorEntered = 0;
+
         // using a sorted list for priority; we'll mostly be reading from this; 
         // gates are in a Queue, which is a circular buffer, and very fast for linear read with an iterator
         readonly SortedList<int, Queue<PriorityGate>> _gates = new SortedList<int, Queue<PriorityGate>>();
@@ -167,8 +169,12 @@ namespace PrioritySchedulingTools
         {
             lock (_lk)
             {
+                var count = Interlocked.Increment(ref _monitorEntered);
+
+
 #if DIAGNOSTICS
                 Console.WriteLine($"{nameof(CompletedGate)} lock taken thread {Thread.CurrentThread.ManagedThreadId}");
+                Console.WriteLine($"Count: {count}");
 #endif
 
 
@@ -197,8 +203,10 @@ namespace PrioritySchedulingTools
                 Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "CompletedGate / activated -- active count mismatch");
 #endif
 
+                count = Interlocked.Decrement(ref _monitorEntered);
 #if DIAGNOSTICS
                 Console.WriteLine($"{nameof(CompletedGate)} lock release...");
+                Console.WriteLine($"Count: {count}");
 #endif
             }
         }
@@ -209,8 +217,10 @@ namespace PrioritySchedulingTools
         {
             lock (_lk)
             {
+                var count = Interlocked.Increment(ref _monitorEntered);
 #if DIAGNOSTICS
                 Console.WriteLine($"{nameof(AddGate)} lock taken thread {Thread.CurrentThread.ManagedThreadId}");
+                Console.WriteLine($"Count: {count}");
 #endif
 
 
@@ -244,8 +254,10 @@ namespace PrioritySchedulingTools
 #endif
                 }
 
+                count = Interlocked.Decrement(ref _monitorEntered);
 #if DIAGNOSTICS
                 Console.WriteLine($"{nameof(AddGate)} lock release...");
+                Console.WriteLine($"Count: {count}");
 #endif
             }
         }
@@ -361,13 +373,17 @@ namespace PrioritySchedulingTools
         {
             lock (_lk)
             {
+                var count = Interlocked.Increment(ref _monitorEntered);
 #if DIAGNOSTICS
                 Console.WriteLine($"{nameof(WaitToContinueAsync)} lock taken thread {Thread.CurrentThread.ManagedThreadId}");
+                Console.WriteLine($"Count: {count}");
 #endif
                 var wait = priorityGate.ConditionalHalt();
 
+                count = Interlocked.Decrement(ref _monitorEntered);
 #if DIAGNOSTICS
                 Console.WriteLine($"{nameof(WaitToContinueAsync)} lock release...");
+                Console.WriteLine($"Count: {count}");
 #endif
                 return wait;
             }
