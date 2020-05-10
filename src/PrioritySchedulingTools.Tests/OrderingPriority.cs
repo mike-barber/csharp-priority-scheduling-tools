@@ -16,7 +16,7 @@ namespace PrioritySchedulingTools.Tests
         {
             int PrioLevels = 5;
             int NumThreads = 4;
-            int N = 500;
+            int N = 1000;
 
             using var cts = new CancellationTokenSource();
 
@@ -42,7 +42,7 @@ namespace PrioritySchedulingTools.Tests
                     {
                         // wait for start synchronisation
                         syncStart.Wait();
-                        Thread.Sleep(1);
+                        Thread.Sleep(5);
                         return (prio,idx);
                     });
                 }).ToArray();

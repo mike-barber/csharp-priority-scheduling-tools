@@ -110,9 +110,9 @@ namespace PrioritySchedulingTools
                 if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(SetActive)} invalid transition {CurrentState} -> {State.Active}");
                 CurrentState = State.Active;
 
-                // release semaphore if it exists -- i.e. allow the waiting task
-                // to proceed
-                if (_semaphore != null)
+                // release semaphore if it exists -- i.e. allow the waiting task to proceed.
+                // note that we check it isn't already signalled, from active->wait->active before the gate hit ConditionalHalt()
+                if (_semaphore != null && _semaphore.CurrentCount == 0)
                     _semaphore.Release();
             }
 
@@ -133,8 +133,17 @@ namespace PrioritySchedulingTools
 
                 // create semaphore if not created yet
                 if (_semaphore == null)
+                {
                     _semaphore = new SemaphoreSlim(0, 1);
+                }
+                else
+                {
+                    // existing semaphor: clear existing signalled state (will return immediately)
+                    if (_semaphore.CurrentCount == 1)
+                        _semaphore.Wait();
+                }
 
+                // return task waiting on the semaphor
                 return _semaphore.WaitAsync(_cancellationToken);
             }
 
@@ -185,7 +194,7 @@ namespace PrioritySchedulingTools
             }
         }
 
-        
+
 
         private void AddGate(PriorityGate priorityGate)
         {
