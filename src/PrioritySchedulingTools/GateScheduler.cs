@@ -46,6 +46,15 @@ namespace PrioritySchedulingTools
         public static bool operator <=(PrioId a, PrioId b) => a.CompareTo(b) <= 0;
         public static bool operator ==(PrioId a, PrioId b) => a.Equals(b);
         public static bool operator !=(PrioId a, PrioId b) => !a.Equals(b);
+
+        public override bool Equals(object obj)
+        {
+            if (obj is PrioId)
+                return Equals((PrioId)obj);
+            return false;
+        }
+
+        public override int GetHashCode() => HashCode.Combine(Prio,Id);
     }
 
     public class GateScheduler
@@ -110,7 +119,7 @@ namespace PrioritySchedulingTools
 
             public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} waiting {CurrentState}]";
 
-            public (int,long) PrioId { get => (Prio, Id); }
+            public PrioId PrioId { get => new PrioId(Prio,Id); }
         }
 
         public const int InitialQueueSize = 2048;
@@ -125,7 +134,7 @@ namespace PrioritySchedulingTools
         long _idCounter = 0;
 
         // keep track of which gates are currently active
-        readonly Dictionary<(int, long), PriorityGate> _activeGates = new Dictionary<(int, long), PriorityGate>();
+        readonly Dictionary<PrioId, PriorityGate> _activeGates = new Dictionary<PrioId, PriorityGate>();
 
         bool _refreshNextWaitingGate = false;
         PriorityGate _nextWaitingGate = null;
