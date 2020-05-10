@@ -16,7 +16,7 @@ namespace PrioritySchedulingTools.Tests
         {
             int PrioLevels = 5;
             int NumThreads = 4;
-            int N = 2500;
+            int N = 500;
 
             using var cts = new CancellationTokenSource();
 
