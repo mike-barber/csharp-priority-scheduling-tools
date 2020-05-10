@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PrioritySchedulingTools.RunTest": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

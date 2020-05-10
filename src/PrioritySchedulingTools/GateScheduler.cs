@@ -112,8 +112,8 @@ namespace PrioritySchedulingTools
                 CurrentState = State.Active;
 
                 // release semaphore if it exists -- i.e. allow the waiting task
-                // to proceed
-                if (_semaphore != null)
+                // to proceed; and only if it's not already signalled
+                if (_semaphore != null && _semaphore.CurrentCount == 0)
                     _semaphore.Release();
             }
 
@@ -136,6 +136,10 @@ namespace PrioritySchedulingTools
                 if (_semaphore == null)
                     _semaphore = new SemaphoreSlim(0, 1);
 
+                // clear semaphor if it has a run signal already (from wait -> active -> wait -> active)
+                if (_semaphore.CurrentCount == 1)
+                    _semaphore.Wait();
+
                 return _semaphore.WaitAsync(_cancellationToken);
             }
 
@@ -147,8 +151,9 @@ namespace PrioritySchedulingTools
         public const int InitialQueueSize = 2048;
 
         // invariants
-        readonly object _lk = new object();
+        readonly object _lkOld = new object();
         readonly int _concurrency;
+        readonly SemaphoreSlim _lkSem = new SemaphoreSlim(1, 1);
 
         int _monitorEntered = 0;
 
@@ -167,20 +172,28 @@ namespace PrioritySchedulingTools
 
         private void CompletedGate(PriorityGate priorityGate)
         {
-            lock (_lk)
+            _lkSem.Wait();
+            try
             {
                 var count = Interlocked.Increment(ref _monitorEntered);
+                Console.WriteLine(nameof(CompletedGate) + " " + count);
+                if (count > 1)
+                {
+                    Console.WriteLine("Count!");
+                }
+
+                
 
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                 Console.WriteLine($"{nameof(CompletedGate)} lock taken thread {Thread.CurrentThread.ManagedThreadId}");
                 Console.WriteLine($"Count: {count}");
 #endif
 
 
-                Debug.Assert(priorityGate.CurrentState != State.Complete, "cannot complete more than once");
+                //Debug.Assert(priorityGate.CurrentState != State.Complete, "cannot complete more than once");
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                 Console.WriteLine($"Gate completing: {priorityGate}, thread {Thread.CurrentThread.ManagedThreadId}");
                 Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "CompletedGate / pre -- active count mismatch");
 #endif
@@ -189,7 +202,7 @@ namespace PrioritySchedulingTools
                 _activeGates.Remove(priorityGate.PrioId);
                 priorityGate.Complete();
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                 Console.WriteLine($"Gate completed: {priorityGate}, ACTIVE GATES: {DiagActiveGates()}");
                 Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "CompletedGate / completed -- active count mismatch");
 #endif
@@ -198,27 +211,39 @@ namespace PrioritySchedulingTools
                 // activate highest-priority waiting gate
                 var activated = ConditionallyActivateWaitingGate();
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                 if (activated != null) Console.WriteLine($"Gate activated: {activated}, thread {Thread.CurrentThread.ManagedThreadId}");
                 Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "CompletedGate / activated -- active count mismatch");
 #endif
 
-                count = Interlocked.Decrement(ref _monitorEntered);
-#if DIAGNOSTICS
+                Console.WriteLine("Act.");
+#if DIAGNOSTICS2
                 Console.WriteLine($"{nameof(CompletedGate)} lock release...");
                 Console.WriteLine($"Count: {count}");
 #endif
             }
+            finally
+            {
+                var count = Interlocked.Decrement(ref _monitorEntered);
+                Console.WriteLine(nameof(CompletedGate) + "- " + count);
+                _lkSem.Release();
+            }
         }
 
-        
+
 
         private void AddGate(PriorityGate priorityGate)
         {
-            lock (_lk)
+            _lkSem.Wait();
+            try
             {
                 var count = Interlocked.Increment(ref _monitorEntered);
-#if DIAGNOSTICS
+                Console.WriteLine(nameof(AddGate) + " " + count);
+                if (count > 1)
+                {
+                    Console.WriteLine("Count!");
+                }
+#if DIAGNOSTICS2
                 Console.WriteLine($"{nameof(AddGate)} lock taken thread {Thread.CurrentThread.ManagedThreadId}");
                 Console.WriteLine($"Count: {count}");
 #endif
@@ -232,7 +257,7 @@ namespace PrioritySchedulingTools
                 // add the gate to the end of the queue
                 gateQueue.Enqueue(priorityGate);
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                 Console.WriteLine($"Gate added: {priorityGate}, thread {Thread.CurrentThread.ManagedThreadId}");
                 Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "AddGate / pre-activation -- active count mismatch");
 #endif
@@ -249,16 +274,20 @@ namespace PrioritySchedulingTools
                     {
                         SwapActive(leastImportantActive, priorityGate);
                     }
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                     Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "AddGate / SwapActive -- active count mismatch");
 #endif
                 }
 
                 count = Interlocked.Decrement(ref _monitorEntered);
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                 Console.WriteLine($"{nameof(AddGate)} lock release...");
                 Console.WriteLine($"Count: {count}");
 #endif
+            }
+            finally
+            {
+                _lkSem.Release();
             }
         }
 
@@ -317,19 +346,19 @@ namespace PrioritySchedulingTools
         // inside lock
         private void SwapActive(PriorityGate leastImportantActive, PriorityGate priorityGate)
         {
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
             Console.WriteLine($"Swapping active from {leastImportantActive} -> {priorityGate}");
             Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "SwapActive / pre -- active count mismatch");
 #endif
             GateTransitionWait(leastImportantActive);
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
             Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "SwapActive / transitioned wait -- active count mismatch");
 #endif
 
             GateTransitionActive(priorityGate);
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
             Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)), "SwapActive / transitioned active -- active count mismatch");
 #endif
         }
@@ -337,24 +366,24 @@ namespace PrioritySchedulingTools
         // inside lock
         private void GateTransitionActive(PriorityGate gate)
         {
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
             Console.WriteLine($"Tranitioning to Active: {gate}");
 #endif
             Debug.Assert(gate.CurrentState == State.Wait, "gate must be waiting to transition to active");
             gate.SetActive();
             _activeGates.Add(gate.PrioId, gate);
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
             Console.WriteLine($"Tranitioned to Active: {gate}, ACTIVE GATES: {DiagActiveGates()}");
 #endif
         }
 
-        
+
 
         // inside lock
         private void GateTransitionWait(PriorityGate gate)
         {
-#if DIAGNOSTICS
+#if DIAGNOSTICS3
             Console.WriteLine($"Tranitioning to Wait: {gate}");
 #endif
 
@@ -362,7 +391,7 @@ namespace PrioritySchedulingTools
             gate.SetWait();
             _activeGates.Remove(gate.PrioId);
 
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
             Console.WriteLine($"Tranitioned to Wait: {gate}, ACTIVE GATES: {DiagActiveGates()}");
 #endif
         }
@@ -371,21 +400,32 @@ namespace PrioritySchedulingTools
 
         private Task WaitToContinueAsync(PriorityGate priorityGate)
         {
-            lock (_lk)
+            _lkSem.Wait();
+            try
             {
                 var count = Interlocked.Increment(ref _monitorEntered);
-#if DIAGNOSTICS
+                Console.WriteLine(nameof(WaitToContinueAsync) + " " + count);
+                if (count > 1)
+                {
+                    Console.WriteLine("Count!");
+                }
+
+#if DIAGNOSTICS2
                 Console.WriteLine($"{nameof(WaitToContinueAsync)} lock taken thread {Thread.CurrentThread.ManagedThreadId}");
                 Console.WriteLine($"Count: {count}");
 #endif
                 var wait = priorityGate.ConditionalHalt();
 
                 count = Interlocked.Decrement(ref _monitorEntered);
-#if DIAGNOSTICS
+#if DIAGNOSTICS2
                 Console.WriteLine($"{nameof(WaitToContinueAsync)} lock release...");
                 Console.WriteLine($"Count: {count}");
 #endif
                 return wait;
+            }
+            finally
+            {
+                _lkSem.Release();
             }
         }
 
