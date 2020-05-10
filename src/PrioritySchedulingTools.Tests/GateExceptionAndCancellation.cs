@@ -18,7 +18,40 @@ namespace PrioritySchedulingTools.Tests
         int Reps = 10;
 
         [Fact]
-        public void ExceptionTestAsync()
+        public void ExceptionTestAsyncAll()
+        {
+            var scheduler = new GateScheduler(NumThreads);
+
+            for (var r = 0; r < Reps; ++r)
+            {
+                int N = 100;
+                var tasks = new Task<int>[100];
+                for (int i = 0; i < N; ++i)
+                {
+                    var index = i;
+                    var prio = i % 3;
+                    var thread = i % NumThreads;
+
+                    tasks[i] = scheduler.GatedRun(prio, async (gate) =>
+                    {
+                        await gate.WaitToContinueAsync();
+                        throw new MyException();
+#pragma warning disable CS0162 // Unreachable code detected
+                        return index;
+#pragma warning restore CS0162 // Unreachable code detected
+                    });
+                }
+
+                // some tasks should throw
+                for (var i = 0; i < N; ++i)
+                {
+                    Assert.Throws<MyException>(() => tasks[i].GetAwaiter().GetResult());
+                }
+            }
+        }
+
+        [Fact]
+        public void ExceptionTestAsyncSome()
         {
             var scheduler = new GateScheduler(NumThreads);
 
@@ -91,8 +124,8 @@ namespace PrioritySchedulingTools.Tests
                     {
                         await gate.WaitToContinueAsync();
 
-                    // throw INSIDE task
-                    if (shouldCancel)
+                        // throw INSIDE task
+                        if (shouldCancel)
                             token.ThrowIfCancellationRequested();
 
                         return index;
@@ -149,13 +182,13 @@ namespace PrioritySchedulingTools.Tests
                     var cancellationToken = shouldCancel ? token : CancellationToken.None;
                     tasks[i] = scheduler.GatedRun(prio, async (gate) =>
                     {
-                    // should not be here if we should cancel prior
-                    Assert.False(shouldCancel, "throw inside the task; should never get here");
+                        // should not be here if we should cancel prior
+                        Assert.False(shouldCancel, "throw inside the task; should never get here");
 
                         await gate.WaitToContinueAsync();
 
-                    // complete successfully
-                    return index;
+                        // complete successfully
+                        return index;
                     },
                     // set cancellation token on the task -- this should cancel the task before it starts
                     cancellationToken);

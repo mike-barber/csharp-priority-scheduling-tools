@@ -18,6 +18,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrioritySchedulingTools.Ben
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrioritySchedulingTools.Tests", "src\PrioritySchedulingTools.Tests\PrioritySchedulingTools.Tests.csproj", "{53134C7A-D4BF-4820-934F-D725618250A0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrioritySchedulingTools.RunTest", "src\PrioritySchedulingTools.RunTest\PrioritySchedulingTools.RunTest.csproj", "{08289585-575A-49D2-85D8-890ECBE397EF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,6 +42,10 @@ Global
 		{53134C7A-D4BF-4820-934F-D725618250A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53134C7A-D4BF-4820-934F-D725618250A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{53134C7A-D4BF-4820-934F-D725618250A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{08289585-575A-49D2-85D8-890ECBE397EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{08289585-575A-49D2-85D8-890ECBE397EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{08289585-575A-49D2-85D8-890ECBE397EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{08289585-575A-49D2-85D8-890ECBE397EF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
