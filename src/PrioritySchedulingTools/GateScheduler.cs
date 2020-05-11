@@ -66,12 +66,14 @@ namespace PrioritySchedulingTools
         {
             private readonly GateScheduler _scheduler;
             private readonly CancellationToken _cancellationToken;
-            // local lock for less contention on WaitToContinueAsync calls
-            private readonly object _gateLk = new object(); 
+            
+            // local lock for less contention on WaitToContinueAsync calls; mostly uncontended
+            private readonly object _gateLock = new object(); 
 
             public readonly int Prio;
             public readonly long Id;
-            public State CurrentState { get; private set; }
+
+            private State _currentState;
 
             private SemaphoreSlim _semaphore = null;
 
@@ -80,7 +82,7 @@ namespace PrioritySchedulingTools
                 _scheduler = scheduler;
                 _cancellationToken = ct;
 
-                CurrentState = State.Wait;
+                _currentState = State.Wait;
                 Prio = priority;
                 Id = id;
 
@@ -89,10 +91,10 @@ namespace PrioritySchedulingTools
 
             internal void Complete()
             {
-                lock (_gateLk)
+                lock (_gateLock)
                 {
                     // mark complete and dispose the semaphore
-                    CurrentState = State.Complete;
+                    _currentState = State.Complete;
                     _semaphore?.Dispose();
                     _semaphore = null;
                 }
@@ -100,14 +102,14 @@ namespace PrioritySchedulingTools
 
             public Task WaitToContinueAsync()
             {
-                lock (_gateLk)
+                lock (_gateLock)
                 {
                     // immediately continue -- we're active
-                    if (CurrentState == State.Active)
+                    if (_currentState == State.Active)
                         return Task.CompletedTask;
 
                     // should be Wait here
-                    if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(WaitToContinueAsync)} invalid state {CurrentState}");
+                    if (_currentState != State.Wait) throw new InvalidOperationException($"{nameof(WaitToContinueAsync)} invalid state {_currentState}");
 
                     // create semaphore if not created yet
                     if (_semaphore == null)
@@ -128,10 +130,10 @@ namespace PrioritySchedulingTools
 
             internal void SetActive()
             {
-                lock (_gateLk)
+                lock (_gateLock)
                 {
-                    if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(SetActive)} invalid transition {CurrentState} -> {State.Active}");
-                    CurrentState = State.Active;
+                    if (_currentState != State.Wait) throw new InvalidOperationException($"{nameof(SetActive)} invalid transition {_currentState} -> {State.Active}");
+                    _currentState = State.Active;
 
                     // release semaphore if it exists -- i.e. allow the waiting task to proceed.
                     // note that we check it isn't already signalled, from active->wait->active before the gate hit ConditionalHalt()
@@ -142,22 +144,30 @@ namespace PrioritySchedulingTools
 
             internal void SetWait()
             {
-                lock (_gateLk)
+                lock (_gateLock)
                 {
-                    if (CurrentState != State.Active) throw new InvalidOperationException($"{nameof(SetWait)} invalid transition {CurrentState} -> {State.Wait}");
-                    CurrentState = State.Wait;
+                    if (_currentState != State.Active) throw new InvalidOperationException($"{nameof(SetWait)} invalid transition {_currentState} -> {State.Wait}");
+                    _currentState = State.Wait;
                 }
             }
 
-            public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} state {CurrentState} semaphore {_semaphore?.CurrentCount}]";
+            public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} state {_currentState} semaphore {_semaphore?.CurrentCount}]";
 
             public PrioId PrioId { get => new PrioId(Prio, Id); }
+
+            public State GetCurrentState()
+            {
+                lock (_gateLock)
+                {
+                    return _currentState;
+                }
+            }
         }
 
         public const int InitialQueueSize = 2048;
 
         // invariants
-        readonly object _lk = new object();
+        readonly object _schedulerLock = new object();
         readonly int _concurrency;
 
         // using a sorted list for priority; we'll mostly be reading from this; 
@@ -175,9 +185,9 @@ namespace PrioritySchedulingTools
 
         private void CompletedGate(PriorityGate priorityGate)
         {
-            lock (_lk)
+            lock (_schedulerLock)
             {
-                Debug.Assert(priorityGate.CurrentState != State.Complete, "cannot complete more than once");
+                Debug.Assert(priorityGate.GetCurrentState() != State.Complete, "cannot complete more than once");
 
                 // Gate can be removed even if it is inactive -- this will happen if a cancellation
                 // token has been cancelled before the task even starts. 
@@ -200,7 +210,7 @@ namespace PrioritySchedulingTools
 
         private void AddGate(PriorityGate priorityGate)
         {
-            lock (_lk)
+            lock (_schedulerLock)
             {
                 // add priority stratum as required
                 if (!_gates.TryGetValue(priorityGate.Prio, out var gateQueue))
@@ -247,7 +257,7 @@ namespace PrioritySchedulingTools
                 var gq = queue;
 
                 // remove all completed gates; fewer to search through later, and we free them for GC
-                while (gq.TryPeek(out var g) && g.CurrentState == State.Complete)
+                while (gq.TryPeek(out var g) && g.GetCurrentState() == State.Complete)
                 {
                     gq.Dequeue();
                 }
@@ -255,7 +265,7 @@ namespace PrioritySchedulingTools
                 // return first waiting or unstarted gate
                 foreach (var gate in gq)
                 {
-                    if (gate.CurrentState == State.Wait)
+                    if (gate.GetCurrentState() == State.Wait)
                     {
                         // return the gate we found
                         return gate;
@@ -285,7 +295,6 @@ namespace PrioritySchedulingTools
         // inside lock
         private void GateTransitionActive(PriorityGate gate)
         {
-            Debug.Assert(gate.CurrentState == State.Wait, "gate must be waiting to transition to active");
             gate.SetActive();
             _activeGates.Add(gate.PrioId, gate);
         }
@@ -293,7 +302,6 @@ namespace PrioritySchedulingTools
         // inside lock
         private void GateTransitionWait(PriorityGate gate)
         {
-            Debug.Assert(gate.CurrentState == State.Active, "gate must be active to transition to wait");
             gate.SetWait();
             _activeGates.Remove(gate.PrioId);
         }
@@ -352,7 +360,7 @@ namespace PrioritySchedulingTools
         // EXPENSIVE: for debugging and testing
         public int GetTotalQueueSize()
         {
-            lock (_lk)
+            lock (_schedulerLock)
             {
                 return _gates.Values.Sum(gq => gq.Count);
             }
