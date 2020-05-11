@@ -7,6 +7,7 @@ using System.Resources;
 using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Schema;
 
 namespace PrioritySchedulingTools
 {
@@ -65,6 +66,8 @@ namespace PrioritySchedulingTools
         {
             private readonly GateScheduler _scheduler;
             private readonly CancellationToken _cancellationToken;
+            // local lock for less contention on WaitToContinueAsync calls
+            private readonly object _gateLk = new object(); 
 
             public readonly int Prio;
             public readonly long Id;
@@ -84,67 +87,66 @@ namespace PrioritySchedulingTools
                 _scheduler.AddGate(this);
             }
 
-            private SemaphoreSlim GetSemaphore()
-            {
-                if (_semaphore == null)
-                    _semaphore = new SemaphoreSlim(0, 1);
-
-                return _semaphore;
-            }
-
             internal void Complete()
             {
-                // mark complete and dispose the semaphore
-                CurrentState = State.Complete;
-                _semaphore?.Dispose();
-                _semaphore = null;
+                lock (_gateLk)
+                {
+                    // mark complete and dispose the semaphore
+                    CurrentState = State.Complete;
+                    _semaphore?.Dispose();
+                    _semaphore = null;
+                }
             }
 
             public Task WaitToContinueAsync()
             {
-                return _scheduler.WaitToContinueAsync(this);
+                lock (_gateLk)
+                {
+                    // immediately continue -- we're active
+                    if (CurrentState == State.Active)
+                        return Task.CompletedTask;
+
+                    // should be Wait here
+                    if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(WaitToContinueAsync)} invalid state {CurrentState}");
+
+                    // create semaphore if not created yet
+                    if (_semaphore == null)
+                    {
+                        _semaphore = new SemaphoreSlim(0, 1);
+                    }
+                    else
+                    {
+                        // existing semaphor: clear existing signalled state (will return immediately)
+                        if (_semaphore.CurrentCount == 1)
+                            _semaphore.Wait();
+                    }
+
+                    // return task waiting on the semaphor
+                    return _semaphore.WaitAsync(_cancellationToken);
+                }
             }
 
             internal void SetActive()
             {
-                if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(SetActive)} invalid transition {CurrentState} -> {State.Active}");
-                CurrentState = State.Active;
+                lock (_gateLk)
+                {
+                    if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(SetActive)} invalid transition {CurrentState} -> {State.Active}");
+                    CurrentState = State.Active;
 
-                // release semaphore if it exists -- i.e. allow the waiting task to proceed.
-                // note that we check it isn't already signalled, from active->wait->active before the gate hit ConditionalHalt()
-                if (_semaphore != null && _semaphore.CurrentCount == 0)
-                    _semaphore.Release();
+                    // release semaphore if it exists -- i.e. allow the waiting task to proceed.
+                    // note that we check it isn't already signalled, from active->wait->active before the gate hit ConditionalHalt()
+                    if (_semaphore != null && _semaphore.CurrentCount == 0)
+                        _semaphore.Release();
+                }
             }
 
             internal void SetWait()
             {
-                if (CurrentState != State.Active) throw new InvalidOperationException($"{nameof(SetWait)} invalid transition {CurrentState} -> {State.Wait}");
-                CurrentState = State.Wait;
-            }
-
-            internal Task ConditionalHalt()
-            {
-                // immediately continue -- we're active
-                if (CurrentState == State.Active)
-                    return Task.CompletedTask;
-
-                // should be Wait here
-                if (CurrentState != State.Wait) throw new InvalidOperationException($"{nameof(ConditionalHalt)} invalid state {CurrentState}");
-
-                // create semaphore if not created yet
-                if (_semaphore == null)
+                lock (_gateLk)
                 {
-                    _semaphore = new SemaphoreSlim(0, 1);
+                    if (CurrentState != State.Active) throw new InvalidOperationException($"{nameof(SetWait)} invalid transition {CurrentState} -> {State.Wait}");
+                    CurrentState = State.Wait;
                 }
-                else
-                {
-                    // existing semaphor: clear existing signalled state (will return immediately)
-                    if (_semaphore.CurrentCount == 1)
-                        _semaphore.Wait();
-                }
-
-                // return task waiting on the semaphor
-                return _semaphore.WaitAsync(_cancellationToken);
             }
 
             public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} state {CurrentState} semaphore {_semaphore?.CurrentCount}]";
@@ -296,14 +298,6 @@ namespace PrioritySchedulingTools
             _activeGates.Remove(gate.PrioId);
         }
 
-
-        private Task WaitToContinueAsync(PriorityGate priorityGate)
-        {
-            lock (_lk)
-            {
-                return priorityGate.ConditionalHalt();
-            }
-        }
 
         // create a new gate with next id
         private PriorityGate CreateGate(int priority, CancellationToken ct)
