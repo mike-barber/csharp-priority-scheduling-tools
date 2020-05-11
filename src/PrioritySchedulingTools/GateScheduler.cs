@@ -323,11 +323,11 @@ namespace PrioritySchedulingTools
                 var task = Task.Run(async () =>
                 {
                     // wait until we can start
-                    await gate.WaitToContinueAsync();
-                    return await asyncFunction(gate);
+                    await gate.WaitToContinueAsync().ConfigureAwait(false);
+                    return await asyncFunction(gate).ConfigureAwait(false);
                 }, ct);
 
-                await task;
+                await task.ConfigureAwait(false);
                 return task.Result;
             }
             finally
@@ -345,11 +345,11 @@ namespace PrioritySchedulingTools
                 var task = Task.Run(async () =>
                 {
                     // wait until we can start
-                    await gate.WaitToContinueAsync();
-                    await asyncFunction(gate);
+                    await gate.WaitToContinueAsync().ConfigureAwait(false);
+                    await asyncFunction(gate).ConfigureAwait(false);
                 }, ct);
 
-                await task;
+                await task.ConfigureAwait(false);
             }
             finally
             {
