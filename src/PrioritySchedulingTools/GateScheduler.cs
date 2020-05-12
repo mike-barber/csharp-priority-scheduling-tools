@@ -243,7 +243,7 @@ namespace PrioritySchedulingTools
                 }
 
 #if DIAGNOSTICS
-                Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.CurrentState == State.Active)));
+                Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.GetCurrentState() == State.Active)));
 #endif
             }
         }
