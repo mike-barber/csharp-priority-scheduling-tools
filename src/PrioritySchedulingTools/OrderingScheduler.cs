@@ -149,7 +149,7 @@ namespace PrioritySchedulingTools
             }
         }
 
-        public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function, CancellationToken cancellationToken = default)
         {
             var fut = new Future<T>(function, cancellationToken);
             lock (_lk)

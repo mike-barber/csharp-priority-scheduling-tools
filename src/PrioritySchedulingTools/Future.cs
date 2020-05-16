@@ -43,6 +43,7 @@ namespace PrioritySchedulingTools
             }
 
             // otherwise, attempt to run and record exception if it occurs
+#pragma warning disable CA1031 // Do not catch general exception types
             try
             {
                 var res = _function();
@@ -52,6 +53,7 @@ namespace PrioritySchedulingTools
             {
                 _completionSource.SetException(exc);
             }
+#pragma warning restore CA1031 // Do not catch general exception types
         }
 
         // get the completion task that will complete after Run() is called

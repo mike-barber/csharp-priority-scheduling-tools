@@ -60,18 +60,25 @@ namespace PrioritySchedulingTools
         public override int GetHashCode() => HashCode.Combine(Prio, Id);
     }
 
+    public interface IGate
+    {
+        Task WaitToContinueAsync();
+        int Prio { get; }
+        long Id { get; }
+    }
+
     public class GateScheduler
     {
-        public class PriorityGate
+        private class PriorityGate : IGate
         {
             private readonly GateScheduler _scheduler;
             private readonly CancellationToken _cancellationToken;
-            
-            // local lock for less contention on WaitToContinueAsync calls; mostly uncontended
-            private readonly object _gateLock = new object(); 
 
-            public readonly int Prio;
-            public readonly long Id;
+            // local lock for less contention on WaitToContinueAsync calls; mostly uncontended
+            private readonly object _gateLock = new object();
+
+            public int Prio { get; }
+            public long Id { get; }
 
             private State _currentState;
 
@@ -314,7 +321,7 @@ namespace PrioritySchedulingTools
             return new PriorityGate(this, priority, id, ct);
         }
 
-        public async Task<T> GatedRun<T>(int priority, Func<PriorityGate, Task<T>> asyncFunction, CancellationToken ct = default)
+        public async Task<T> GatedRun<T>(int priority, Func<IGate, Task<T>> asyncFunction, CancellationToken ct = default)
         {
             // create gate first (for priorisation), then asynchronously run the function, passing the gate to it
             var gate = CreateGate(priority, ct);
@@ -336,7 +343,7 @@ namespace PrioritySchedulingTools
             }
         }
 
-        public async Task GatedRun(int priority, Func<PriorityGate, Task> asyncFunction, CancellationToken ct = default)
+        public async Task GatedRun(int priority, Func<IGate, Task> asyncFunction, CancellationToken ct = default)
         {
             // create gate first (for priorisation), then asynchronously run the function, passing the gate to it
             var gate = CreateGate(priority, ct);
