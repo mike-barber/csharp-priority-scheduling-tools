@@ -27,7 +27,7 @@ This is *not* an attempt to replace the `TaskScheduler` with a more specific one
 
 An idea of the complexities involved can be gained by reviewing the [source code](https://github.com/dotnet/runtime/blob/master/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/ConcurrentExclusiveSchedulerPair.cs). It's also worth noting that it relies on calling certain `internal` methods. I've attempted some of this previously, but never been happy with the results. There are a lot of edge cases.
 
-Instead, the idea is to provide tools that work on top of the normal TaskScheduler instead of attempting to replace it.
+Instead, the idea is to provide tools that work *with* the normal TaskScheduler instead of attempting to extend or replace it.
 
 ### Not for *concurrency*: It's for compute *parallelism*
 
