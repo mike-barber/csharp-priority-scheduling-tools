@@ -4,8 +4,9 @@
     <Version>0.5.0</Version>
     <Authors>Michael Barber</Authors>
     <RepositoryUrl>https://github.com/mike-barber/csharp-priority-scheduling-tools</RepositoryUrl>
-    <Description>Priority Scheduling tools for C#</Description>
+    <Description>Priority Scheduling Tools for C# are useful for managing scheduling of compute-bound tasks with priorities</Description>
     <Copyright>2020 Michael Barber</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
 
 </Project>
