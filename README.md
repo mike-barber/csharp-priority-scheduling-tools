@@ -14,8 +14,10 @@ Given that the problem is parallelism, the implementation is (unavoidably) somew
 
 This library provides two tools: 
 
-* `GateScheduler` -- for managing longer *interruptible* tasks with priorities; this is probably the more interesting of the two, given that it's a somewhat more novel idea.
+* `GateScheduler` -- for managing longer *interruptible* tasks with priorities.
 * `OrderingScheduler` -- for managing shorter *uninterruptible* tasks with priorities, with a degree of thread affinity.
+
+The `GateScheduler` is probably the more interesting and novel of the two. It supplies a **gate** to each task, the task simply yields at the gate if a more important task is scheduled.
 
 ## What it is *not* 
 
