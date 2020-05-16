@@ -1,3 +1,5 @@
+![.NET Core](https://github.com/mike-barber/csharp-priority-scheduling-tools/workflows/.NET%20Core/badge.svg?branch=master)
+
 # Priority Scheduling Tools for C#
 
 This is a library to assist with scheduling of compute-bound `Task`s. It aims to offer the following characteristics:
