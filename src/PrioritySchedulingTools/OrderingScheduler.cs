@@ -23,9 +23,9 @@ namespace PrioritySchedulingTools
         private long _stolenCount;
         private long _preferredCount;
 
-        
+        public OrderingScheduler(int threads, CancellationToken ct) : this(threads, TaskScheduler.Default, ct) { }
 
-        public OrderingScheduler(int threads, CancellationToken ct)
+        public OrderingScheduler(int threads, TaskScheduler taskScheduler, CancellationToken ct)
         {
             _numThreads = threads;
             _priorityQueues = new SortedList<int, PriorityQueue>();
@@ -41,7 +41,10 @@ namespace PrioritySchedulingTools
                 .Select(w =>
                 {
                     var worker = w;
-                    var task = Task.Factory.StartNew(() => worker.RunLoop(ct), TaskCreationOptions.LongRunning);
+                    var task = Task.Factory.StartNew(() => worker.RunLoop(ct), 
+                        CancellationToken.None, 
+                        TaskCreationOptions.LongRunning,
+                        taskScheduler);
                     return task;
                 })
                 .ToArray();
@@ -81,7 +84,9 @@ namespace PrioritySchedulingTools
                     if (queue.ThreadedJobs[threadIndex].TryDequeue(out var fut))
                     {
                         returnedFuture = fut;
+#if DIAGNOSTICS
                         Debug.Assert(fut != null);
+#endif
                         _preferredCount++;
                         return true;
                     }
@@ -94,8 +99,10 @@ namespace PrioritySchedulingTools
                     if (queue.ThreadedJobs[otherThreadIdx].TryDequeue(out var fut))
                     {
                         returnedFuture = fut;
+#if DIAGNOSTICS
                         Debug.Assert(fut != null);
-                        //Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
+                        Console.WriteLine($"Stolen: {threadIndex} stole job from {otherThreadIdx}");
+#endif
                         _stolenCount++;
                         return true;
                     }
@@ -145,7 +152,7 @@ namespace PrioritySchedulingTools
             }
         }
 
-        public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<T> Run<T>(int priority, int threadAffinity, Func<T> function, CancellationToken cancellationToken = default)
         {
             var fut = new Future<T>(function, cancellationToken);
             lock (_lk)

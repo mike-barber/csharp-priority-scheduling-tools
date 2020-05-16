@@ -11,16 +11,22 @@ namespace PrioritySchedulingTools.Tests
 {
     public class OrderingPriority
     {
+        // TODO: Re-think this potentially. Results are somewhat random.
         [Fact]
         public void LowestPrioNumberCompletesFirst()
         {
             int PrioLevels = 5;
             int NumThreads = 4;
-            int N = 250;
+            int N = 1000;
 
             using var cts = new CancellationTokenSource();
 
             var scheduler = new OrderingScheduler(NumThreads, cts.Token);
+
+            // use this to synchronise start; we don't support asynchronous tasks, so we
+            // just cause them to block. This is to improve test reliability -- ensure we 
+            // have everything queued before letting them proceed.
+            var syncStart = new ManualResetEventSlim(false);
 
             // set up 3 sets of prioritised tasks; and queue the least important 
             // (highest prio number) first to make life more difficult.
@@ -35,7 +41,9 @@ namespace PrioritySchedulingTools.Tests
                     var thread = i % NumThreads;
                     return scheduler.Run(prio, thread, () =>
                     {
-                        Thread.Sleep(10);
+                        // wait for start synchronisation
+                        syncStart.Wait();
+                        Thread.Sleep(5);
                         return (prio,idx);
                     });
                 }).ToArray();
@@ -58,6 +66,11 @@ namespace PrioritySchedulingTools.Tests
             // specifically reverse the joins so that any weirdness where waiting on less important stuff
             // earlier in the array is revealed as an issue.
             Array.Reverse(joins);
+
+            // allow tasks to proceed
+            syncStart.Set();
+
+            // and check completion times
             Task.WaitAll(joins);
             Console.WriteLine("Completion times: " + string.Join(",", completeTicks));
             for (int i = 1; i < PrioLevels; ++i)

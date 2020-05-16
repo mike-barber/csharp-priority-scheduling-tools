@@ -11,3 +11,8 @@ indent_size = 4
 insert_final_newline = true
 charset = utf-8-bom
 end_of_line = lf
+
+# CA1051: Do not declare visible instance fields; I'm perfectly happy with readonly instance fields.
+dotnet_diagnostic.CA1051.severity = none
+# CA1303: Ignore suggestions about strings as local parameters
+dotnet_diagnostic.CA1303.severity = none

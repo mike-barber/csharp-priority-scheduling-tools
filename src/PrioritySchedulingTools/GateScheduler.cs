@@ -1,194 +1,312 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Text;
+using System.Resources;
+using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Schema;
 
 namespace PrioritySchedulingTools
 {
+    public enum State
+    {
+        Wait,
+        Active,
+        Complete
+    };
+
+    public readonly struct PrioId : IEquatable<PrioId>, IComparable<PrioId>
+    {
+        public readonly int Prio;
+        public readonly long Id;
+
+        public PrioId(int prio, long id)
+        {
+            Prio = prio;
+            Id = id;
+        }
+
+        public int CompareTo(PrioId other)
+        {
+            if (Prio < other.Prio) return -1;
+            if (Prio > other.Prio) return +1;
+            if (Id < other.Id) return -1;
+            if (Id > other.Id) return +1;
+            return 0;
+        }
+
+        public bool Equals(PrioId other)
+        {
+            return Prio == other.Prio & Id == other.Id;
+        }
+
+        public static bool operator >(PrioId a, PrioId b) => a.CompareTo(b) == 1;
+        public static bool operator <(PrioId a, PrioId b) => a.CompareTo(b) == -1;
+        public static bool operator >=(PrioId a, PrioId b) => a.CompareTo(b) >= 0;
+        public static bool operator <=(PrioId a, PrioId b) => a.CompareTo(b) <= 0;
+        public static bool operator ==(PrioId a, PrioId b) => a.Equals(b);
+        public static bool operator !=(PrioId a, PrioId b) => !a.Equals(b);
+
+        public override bool Equals(object obj)
+        {
+            if (obj is PrioId)
+                return Equals((PrioId)obj);
+            return false;
+        }
+
+        public override int GetHashCode() => HashCode.Combine(Prio, Id);
+    }
+
     public class GateScheduler
     {
-        public class PriorityGate : IDisposable
+#pragma warning disable CA1001 // Types that own disposable fields should be disposable: suppress; disposal is handled by the parent GateScheduler
+        private class PriorityGate : IGate
         {
             private readonly GateScheduler _scheduler;
             private readonly CancellationToken _cancellationToken;
 
-            public readonly int Prio;
-            public readonly long Id;
-            public bool Waiting { get; private set; }
+            // local lock for less contention on WaitToContinueAsync calls; mostly uncontended
+            private readonly object _gateLock = new object();
 
-            private SemaphoreSlim _semaphore = new SemaphoreSlim(0, 1);
+            // priority and id struct, with reference property
+            private readonly PrioId _prioId;
+            internal ref readonly PrioId PrioId { get => ref _prioId; }
+
+            // mutable state
+            private State _currentState;
+            private SemaphoreSlim _semaphore = null;
+#pragma warning restore CA1001 
 
             internal PriorityGate(GateScheduler scheduler, int priority, long id, CancellationToken ct)
             {
                 _scheduler = scheduler;
                 _cancellationToken = ct;
 
-                Waiting = true;
-                Prio = priority;
-                Id = id;
+                _currentState = State.Wait;
+                _prioId = new PrioId(priority, id);
 
                 _scheduler.AddGate(this);
             }
 
-            public void Dispose()
+            internal void Complete()
             {
-                _scheduler.RemoveGate(this);
-                _semaphore.Dispose();
+                lock (_gateLock)
+                {
+                    // mark complete and dispose the semaphore
+                    _currentState = State.Complete;
+                    _semaphore?.Dispose();
+                    _semaphore = null;
+                }
             }
 
             public Task WaitToContinueAsync()
             {
-                return _scheduler.WaitToContinueAsync(this);
+                lock (_gateLock)
+                {
+                    // immediately continue -- we're active
+                    if (_currentState == State.Active)
+                        return Task.CompletedTask;
+
+                    // should be Wait here
+                    if (_currentState != State.Wait) throw new InvalidOperationException($"{nameof(WaitToContinueAsync)} invalid state {_currentState}");
+
+                    // create semaphore if not created yet
+                    if (_semaphore == null)
+                    {
+                        _semaphore = new SemaphoreSlim(0, 1);
+                    }
+                    else
+                    {
+                        // existing semaphor: clear existing signalled state (will return immediately)
+                        if (_semaphore.CurrentCount == 1)
+                            _semaphore.Wait();
+                    }
+
+                    // return task waiting on the semaphor
+                    return _semaphore.WaitAsync(_cancellationToken);
+                }
             }
 
-            internal void MarkActive()
+            internal void SetActive()
             {
-                Waiting = false;
+                lock (_gateLock)
+                {
+                    if (_currentState != State.Wait) throw new InvalidOperationException($"{nameof(SetActive)} invalid transition {_currentState} -> {State.Active}");
+                    _currentState = State.Active;
+
+                    // release semaphore if it exists -- i.e. allow the waiting task to proceed.
+                    // note that we check it isn't already signalled, from active->wait->active before the gate hit ConditionalHalt()
+                    if (_semaphore != null && _semaphore.CurrentCount == 0)
+                        _semaphore.Release();
+                }
             }
 
-            internal void Proceed()
+            internal void SetWait()
             {
-                Waiting = false;
-                _semaphore.Release();
+                lock (_gateLock)
+                {
+                    if (_currentState != State.Active) throw new InvalidOperationException($"{nameof(SetWait)} invalid transition {_currentState} -> {State.Wait}");
+                    _currentState = State.Wait;
+                }
             }
 
-            internal Task Halt()
+            public override string ToString() => $"{nameof(PriorityGate)}[id {PrioId.Id} prio {PrioId.Prio} state {_currentState} semaphore {_semaphore?.CurrentCount}]";
+
+            public State GetCurrentState()
             {
-                Waiting = true;
-                return _semaphore.WaitAsync(_cancellationToken);
+                lock (_gateLock)
+                {
+                    return _currentState;
+                }
             }
-
-            public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} waiting {Waiting}]";
         }
 
+        public const int InitialQueueSize = 2048;
+
         // invariants
-        readonly object _lk = new object();
+        readonly object _schedulerLock = new object();
         readonly int _concurrency;
 
-        // Sorted lists are not particularly efficient for insertion, but offer good read efficiency: the latter is more important
-        // in this case, as we'll be checking whether a gate should proceed more often that we will be creating or removing them.
-        readonly SortedList<int, SortedList<long, PriorityGate>> _gates = new SortedList<int, SortedList<long, PriorityGate>>();
+        // using a sorted list for priority; we'll mostly be reading from this; 
+        // gates are in a Queue, which is a circular buffer, and very fast for linear read with an iterator
+        readonly SortedList<int, Queue<PriorityGate>> _gates = new SortedList<int, Queue<PriorityGate>>();
         long _idCounter = 0;
-        int _currentActive;
 
+        // keep track of which gates are currently active
+        readonly Dictionary<PrioId, PriorityGate> _activeGates = new Dictionary<PrioId, PriorityGate>();
 
         public GateScheduler(int concurrency)
         {
             _concurrency = concurrency;
         }
 
-        private void RemoveGate(PriorityGate priorityGate)
+        private void CompletedGate(PriorityGate priorityGate)
         {
-            lock (_lk)
+            lock (_schedulerLock)
             {
-                _gates[priorityGate.Prio].Remove(priorityGate.Id);
+                Debug.Assert(priorityGate.GetCurrentState() != State.Complete, "cannot complete more than once");
 
                 // Gate can be removed even if it is inactive -- this will happen if a cancellation
                 // token has been cancelled before the task even starts. 
-                if (!priorityGate.Waiting)
-                {
-                    // only decrease active number if the task was in fact active
-                    --_currentActive;
-                }
+                _activeGates.Remove(priorityGate.PrioId);
+                priorityGate.Complete();
 
-#if DEBUG
-                //Console.WriteLine($"Gate removed: {priorityGate}");
-                Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
-#endif
-                
                 // start highest-priority gate that's waiting
-                if (_currentActive < _concurrency)
+                if (_activeGates.Count < _concurrency)
                 {
-                    foreach (var (prio,list) in _gates)
+                    var nextGate = FindNextWaitingGate();
+                    if (nextGate != null)
                     {
-                        foreach (var (id, gate) in list)
-                        {
-                            if (gate.Waiting)
-                            {
-                                gate.Proceed();
-                                ++_currentActive;
-                                return;   
-                            }
-                        }
+                        GateTransitionActive(nextGate);
                     }
                 }
             }
         }
+
+
 
         private void AddGate(PriorityGate priorityGate)
         {
-            lock (_lk)
+            lock (_schedulerLock)
             {
                 // add priority stratum as required
-                if (!_gates.TryGetValue(priorityGate.Prio, out var gateList))
+                if (!_gates.TryGetValue(priorityGate.PrioId.Prio, out var gateQueue))
                 {
-                    _gates[priorityGate.Prio] = gateList = new SortedList<long, PriorityGate>();
+                    _gates[priorityGate.PrioId.Prio] = gateQueue = new Queue<PriorityGate>(InitialQueueSize);
                 }
-                gateList[priorityGate.Id] = priorityGate;
+                // add the gate to the end of the queue
+                gateQueue.Enqueue(priorityGate);
 
-#if DEBUG
-                Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
-                //Console.WriteLine($"Gate added: {priorityGate}");
+#if DIAGNOSTICS
+                Console.Error.WriteLine($"Gate added: {priorityGate}");
+#endif
+
+                if (_activeGates.Count < _concurrency)
+                {
+                    // set active immediately if we're below the concurrency limit
+                    GateTransitionActive(priorityGate);
+#if DIAGNOSTICS
+                    Console.Error.WriteLine($"Immediately set active: {priorityGate}");
+#endif
+                }
+                else
+                {
+                    // otherwise, check to see if this gate takes priority over the least important active one
+                    var leastImportantActive = FindLeastImportantActiveGate();
+                    if (leastImportantActive != null && priorityGate.PrioId < leastImportantActive.PrioId)
+                    {
+                        SwapActive(leastImportantActive, priorityGate);
+                    }
+                }
+
+#if DIAGNOSTICS
+                Debug.Assert(_activeGates.Count() == _gates.Values.Sum(l => l.Count(g => g.GetCurrentState() == State.Active)));
 #endif
             }
         }
 
-        private Task WaitToContinueAsync(PriorityGate priorityGate)
+
+
+        private PriorityGate FindNextWaitingGate()
         {
-            lock (_lk)
+            foreach (var queue in _gates.Values)
             {
-                // allow up to max concurrency
-                if (_currentActive < _concurrency)
+                var gq = queue;
+
+                // remove all completed gates; fewer to search through later, and we free them for GC
+                while (gq.TryPeek(out var g) && g.GetCurrentState() == State.Complete)
                 {
-                    if (priorityGate.Waiting)
-                    {
-                        ++_currentActive;
-                        priorityGate.MarkActive();
-                    }
-#if DEBUG
-                    Debug.Assert(_currentActive == _gates.Values.Sum(l => l.Values.Sum(g => g.Waiting ? 0 : 1)));
-#endif
-                    return Task.CompletedTask;
+                    gq.Dequeue();
                 }
 
-                // if gate is already waiting at this point, continue waiting
-                if (priorityGate.Waiting)
+                // return first waiting or unstarted gate
+                foreach (var gate in gq)
                 {
-                    return priorityGate.Halt();
-                }
-
-                // find earlier, more prioritised gate
-                foreach (var (prio, list) in _gates)
-                {
-                    if (prio > priorityGate.Prio)
-                        break;
-
-                    foreach (var (id, gate) in list)
+                    if (gate.GetCurrentState() == State.Wait)
                     {
-                        if (id >= priorityGate.Id & gate.Prio == priorityGate.Prio)
-                            break;
-
-                        // yield to this task -- i.e. allow the other gate to proceed, 
-                        // and halt prevent this one from doing so.
-                        if (gate.Waiting)
-                        {
-#if DEBUG
-                            //Console.WriteLine($"Pre-empting {priorityGate} -> {gate}");
-#endif
-                            gate.Proceed();
-                            return priorityGate.Halt();
-                        }
+                        // return the gate we found
+                        return gate;
                     }
                 }
             }
-
-            // no other gates pre-empted this one -- proceed directly.
-            return Task.CompletedTask;
+            return null;
         }
+
+        // inside lock
+        private PriorityGate FindLeastImportantActiveGate()
+        {
+            if (_activeGates.Count == 0) return null;
+            return _activeGates[_activeGates.Keys.Max()];
+        }
+
+        // inside lock
+        private void SwapActive(PriorityGate leastImportantActive, PriorityGate priorityGate)
+        {
+#if DIAGNOSTICS
+            Console.Error.WriteLine($"Swapping active from {leastImportantActive} -> {priorityGate}");
+#endif
+            GateTransitionWait(leastImportantActive);
+            GateTransitionActive(priorityGate);
+        }
+
+        // inside lock
+        private void GateTransitionActive(PriorityGate gate)
+        {
+            gate.SetActive();
+            _activeGates.Add(gate.PrioId, gate);
+        }
+
+        // inside lock
+        private void GateTransitionWait(PriorityGate gate)
+        {
+            gate.SetWait();
+            _activeGates.Remove(gate.PrioId);
+        }
+
 
         // create a new gate with next id
         private PriorityGate CreateGate(int priority, CancellationToken ct)
@@ -197,43 +315,57 @@ namespace PrioritySchedulingTools
             return new PriorityGate(this, priority, id, ct);
         }
 
-        public async Task<T> GatedRun<T>(int priority, Func<PriorityGate, Task<T>> asyncFunction, CancellationToken ct = default)
+        public async Task<T> GatedRun<T>(int priority, Func<IGate, Task<T>> asyncFunction, CancellationToken ct = default)
         {
             // create gate first (for priorisation), then asynchronously run the function, passing the gate to it
-            using (var g = CreateGate(priority, ct))
+            var gate = CreateGate(priority, ct);
+            try
             {
-                // capture gate
-                var gate = g;
-
                 var task = Task.Run(async () =>
                 {
                     // wait until we can start
-                    await gate.WaitToContinueAsync();
-                    return await asyncFunction(gate);
+                    await gate.WaitToContinueAsync().ConfigureAwait(false);
+                    return await asyncFunction(gate).ConfigureAwait(false);
                 }, ct);
 
-                await task;
+                await task.ConfigureAwait(false);
                 return task.Result;
             }
+            finally
+            {
+                CompletedGate(gate);
+            }
         }
 
-        public async Task GatedRun(int priority, Func<PriorityGate, Task> asyncFunction, CancellationToken ct = default)
+        public async Task GatedRun(int priority, Func<IGate, Task> asyncFunction, CancellationToken ct = default)
         {
             // create gate first (for priorisation), then asynchronously run the function, passing the gate to it
-            using (var g = CreateGate(priority, ct))
+            var gate = CreateGate(priority, ct);
+            try
             {
-                // capture gate
-                var gate = g;
-
                 var task = Task.Run(async () =>
                 {
                     // wait until we can start
-                    await gate.WaitToContinueAsync();
-                    await asyncFunction(gate);
+                    await gate.WaitToContinueAsync().ConfigureAwait(false);
+                    await asyncFunction(gate).ConfigureAwait(false);
                 }, ct);
 
-                await task;
+                await task.ConfigureAwait(false);
+            }
+            finally
+            {
+                CompletedGate(gate);
             }
         }
+
+        // EXPENSIVE: for debugging and testing
+        public int GetTotalQueueSize()
+        {
+            lock (_schedulerLock)
+            {
+                return _gates.Values.Sum(gq => gq.Count);
+            }
+        }
+
     }
 }
