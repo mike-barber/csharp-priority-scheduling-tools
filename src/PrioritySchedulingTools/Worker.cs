@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,10 +32,12 @@ namespace PrioritySchedulingTools
                 {
                     // expected when GetNextJob is cancelled during shutdown
                 }
+#pragma warning disable CA1031 // Do not catch general exception types
                 catch (Exception exc)
                 {
-                    Console.WriteLine($"Caught unexpected exception: {exc}");
+                    Trace.Fail($"Unexpected exception: {exc}");
                 }
+#pragma warning restore CA1031 // Do not catch general exception types
             }
             //Console.WriteLine($"\tWorker complete: {_threadIndex}");
         }

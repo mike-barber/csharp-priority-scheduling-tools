@@ -11,7 +11,7 @@ namespace PrioritySchedulingTools.Example
 {
     class Program
     {
-        static async Task Main(string[] args)
+        static async Task Main()
         {
             await ExampleGateScheduler();
             await ExampleOrderingScheduler();
@@ -81,7 +81,7 @@ namespace PrioritySchedulingTools.Example
 
                             // run the expensive operation
                             total += Expensive();
-                            Console.WriteLine($"Completed task for job {priority}/{i} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {thread} priority {priority} gate id {gate.Id}");
+                            Console.WriteLine($"Completed task for job {priority}/{i} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {thread} priority {priority} gate {gate}");
                             AddCount(thread, Thread.CurrentThread.ManagedThreadId);
                         }
                         return total;

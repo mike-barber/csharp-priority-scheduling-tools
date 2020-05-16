@@ -18,10 +18,10 @@ namespace PrioritySchedulingTools.Benchmark
         public int JobsPerChunk = 250;
         public int NumIterations = 100;
 
-        private OrderingScheduler _orderingScheduler;
-        private GateScheduler _gateScheduler;
+        private readonly OrderingScheduler _orderingScheduler;
+        private readonly GateScheduler _gateScheduler;
 
-        private CancellationTokenSource _cancellationTokenSource;
+        private readonly CancellationTokenSource _cancellationTokenSource;
 
         public SchedulerPerf()
         {

@@ -11,6 +11,7 @@ namespace PrioritySchedulingTools.Tests
 {
     public class OrderingPriority
     {
+        // TODO: Re-think this potentially. Results are somewhat random.
         [Fact]
         public void LowestPrioNumberCompletesFirst()
         {

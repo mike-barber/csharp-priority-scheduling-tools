@@ -23,9 +23,9 @@ namespace PrioritySchedulingTools
         private long _stolenCount;
         private long _preferredCount;
 
-        
+        public OrderingScheduler(int threads, CancellationToken ct) : this(threads, TaskScheduler.Default, ct) { }
 
-        public OrderingScheduler(int threads, CancellationToken ct)
+        public OrderingScheduler(int threads, TaskScheduler taskScheduler, CancellationToken ct)
         {
             _numThreads = threads;
             _priorityQueues = new SortedList<int, PriorityQueue>();
@@ -41,7 +41,10 @@ namespace PrioritySchedulingTools
                 .Select(w =>
                 {
                     var worker = w;
-                    var task = Task.Factory.StartNew(() => worker.RunLoop(ct), TaskCreationOptions.LongRunning);
+                    var task = Task.Factory.StartNew(() => worker.RunLoop(ct), 
+                        CancellationToken.None, 
+                        TaskCreationOptions.LongRunning,
+                        taskScheduler);
                     return task;
                 })
                 .ToArray();

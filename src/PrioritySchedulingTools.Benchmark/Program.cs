@@ -8,7 +8,7 @@ namespace PrioritySchedulingTools.Benchmark
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             var job = Job.Default
                 .WithGcServer(true);

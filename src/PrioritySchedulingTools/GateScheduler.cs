@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,8 +21,8 @@ namespace PrioritySchedulingTools
 
     public readonly struct PrioId : IEquatable<PrioId>, IComparable<PrioId>
     {
-        readonly int Prio;
-        readonly long Id;
+        public readonly int Prio;
+        public readonly long Id;
 
         public PrioId(int prio, long id)
         {
@@ -60,15 +61,9 @@ namespace PrioritySchedulingTools
         public override int GetHashCode() => HashCode.Combine(Prio, Id);
     }
 
-    public interface IGate
-    {
-        Task WaitToContinueAsync();
-        int Prio { get; }
-        long Id { get; }
-    }
-
     public class GateScheduler
     {
+#pragma warning disable CA1001 // Types that own disposable fields should be disposable: suppress; disposal is handled by the parent GateScheduler
         private class PriorityGate : IGate
         {
             private readonly GateScheduler _scheduler;
@@ -77,12 +72,14 @@ namespace PrioritySchedulingTools
             // local lock for less contention on WaitToContinueAsync calls; mostly uncontended
             private readonly object _gateLock = new object();
 
-            public int Prio { get; }
-            public long Id { get; }
+            // priority and id struct, with reference property
+            private readonly PrioId _prioId;
+            internal ref readonly PrioId PrioId { get => ref _prioId; }
 
+            // mutable state
             private State _currentState;
-
             private SemaphoreSlim _semaphore = null;
+#pragma warning restore CA1001 
 
             internal PriorityGate(GateScheduler scheduler, int priority, long id, CancellationToken ct)
             {
@@ -90,8 +87,7 @@ namespace PrioritySchedulingTools
                 _cancellationToken = ct;
 
                 _currentState = State.Wait;
-                Prio = priority;
-                Id = id;
+                _prioId = new PrioId(priority, id);
 
                 _scheduler.AddGate(this);
             }
@@ -158,9 +154,7 @@ namespace PrioritySchedulingTools
                 }
             }
 
-            public override string ToString() => $"{nameof(PriorityGate)}[id {Id} prio {Prio} state {_currentState} semaphore {_semaphore?.CurrentCount}]";
-
-            public PrioId PrioId { get => new PrioId(Prio, Id); }
+            public override string ToString() => $"{nameof(PriorityGate)}[id {PrioId.Id} prio {PrioId.Prio} state {_currentState} semaphore {_semaphore?.CurrentCount}]";
 
             public State GetCurrentState()
             {
@@ -220,9 +214,9 @@ namespace PrioritySchedulingTools
             lock (_schedulerLock)
             {
                 // add priority stratum as required
-                if (!_gates.TryGetValue(priorityGate.Prio, out var gateQueue))
+                if (!_gates.TryGetValue(priorityGate.PrioId.Prio, out var gateQueue))
                 {
-                    _gates[priorityGate.Prio] = gateQueue = new Queue<PriorityGate>(InitialQueueSize);
+                    _gates[priorityGate.PrioId.Prio] = gateQueue = new Queue<PriorityGate>(InitialQueueSize);
                 }
                 // add the gate to the end of the queue
                 gateQueue.Enqueue(priorityGate);
