@@ -24,29 +24,12 @@ namespace PrioritySchedulingTools.Example
             Console.WriteLine("GateScheduler...");
             Console.WriteLine();
 
-
             using var cts = new CancellationTokenSource();
 
             const int Prios = 3;
             const int PerThread = 20;
 
             var gateScheduler = new GateScheduler(Environment.ProcessorCount);
-
-            // counts
-            var counts = new SortedList<int, int>[Environment.ProcessorCount];
-            for (int i = 0; i < Environment.ProcessorCount; ++i)
-                counts[i] = new SortedList<int, int>();
-
-            var lk = new object();
-            void AddCount(int affinity, int threadId)
-            {
-                lock (lk)
-                {
-                    var c = counts[affinity];
-                    if (!c.ContainsKey(threadId)) c[threadId] = 0;
-                    c[threadId] += 1;
-                }
-            }
 
             var tasks = new List<Task<double>>();
             foreach (var p in Enumerable.Range(0, Prios).Reverse())
@@ -82,7 +65,6 @@ namespace PrioritySchedulingTools.Example
                             // run the expensive operation
                             total += Expensive();
                             Console.WriteLine($"Completed task for job {priority}/{i} on thread {Thread.CurrentThread.ManagedThreadId} for original affinity {thread} priority {priority} gate {gate}");
-                            AddCount(thread, Thread.CurrentThread.ManagedThreadId);
                         }
                         return total;
                     });
@@ -94,13 +76,6 @@ namespace PrioritySchedulingTools.Example
             await Task.WhenAll(tasks);
 
             Console.WriteLine("All tasks complete; shutting down");
-
-            var offMainThreadCount = 0;
-            foreach (var c in counts)
-            {
-                Console.WriteLine(string.Join("\t", c.OrderByDescending(cc => cc.Value)));
-                offMainThreadCount += c.OrderByDescending(cc => cc.Value).Skip(1).Sum(cc => cc.Value);
-            }
             Console.WriteLine("--------------------------------------------------------------------------------------------------------");
         }
 

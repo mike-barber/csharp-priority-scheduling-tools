@@ -115,3 +115,7 @@ Note that the `OrderingScheduler` will continue running forever; it accepts a ca
 cancellationTokenSource.Cancel();
 orderingScheduler.WaitForShutdown();
 ```
+
+## `DIAGNOSTICS`
+
+Define this Conditional Compilation Symbol to enable tracing output to the console; you definitely don't want this in a Release build, but it helps to understand what the tools are doing.
