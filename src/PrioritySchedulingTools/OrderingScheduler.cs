@@ -32,7 +32,7 @@ namespace PrioritySchedulingTools
             _waiting = new TaskCompletionSource<Future>[threads];
 
             // create workers
-            _workers = Enumerable.Range(0, Environment.ProcessorCount)
+            _workers = Enumerable.Range(0, threads)
                 .Select(idx => new Worker(this, idx))
                 .ToArray();
 
