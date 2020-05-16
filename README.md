@@ -1,4 +1,4 @@
-# C# Job priority scheduling tools
+# Priority Scheduling Tools for C#
 
 This is a library to assist with scheduling of compute-bound `Task`s. It aims to offer the following characteristics:
 
